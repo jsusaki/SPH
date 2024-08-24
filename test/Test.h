@@ -16,20 +16,18 @@
 struct particle
 {
     vf3 position = { 0.0f, 0.0f, 0.0f };
-    f32 mass = 0.0f;
-    f32 density = 0.0f;
+    f32 mass     = 0.0f;
+    f32 density  = 0.0f;
     f32 pressure = 0.0f;
-    u32 hash = 0;
-    //std::vector<particle*> neighbors;
-    std::vector<u32> neighbors;
 
+    u32 hash     = 0;
+    std::vector<u32> neighbors;
 };
 
-// Grid-based hash neighbour search algorithm
-const u32 TABLE_SIZE = 262144;
+// Grid-based hash neighbor search algorithm
+const u32 TABLE_SIZE  = 262144;
 const u32 NO_PARTICLE = 0xFFFFFFFF;
-
-static vi3 get_cell(const particle& p, f32 h) { return { p.position.x / h, p.position.y / h, p.position.z / h }; }
+static vi3 cell(const particle& p, f32 h) { return { p.position.x / h, p.position.y / h, p.position.z / h }; }
 static u32 hash(const vi3& cell) { return ((u32)(cell.x * 73856093) ^ (u32)(cell.y * 19349663) ^ (u32)(cell.z * 83492791)) % TABLE_SIZE; }
 
 // hash_map: O(nm)
@@ -46,7 +44,7 @@ static void hash_map()
             rand.uniform(-0.5f, 0.0f),
             rand.uniform(-0.5f, 0.0f),
         };
-        p.hash = hash(get_cell(p, config::SMOOTHING_RADIUS));  // Compute Hash
+        p.hash = hash(cell(p, config::SMOOTHING_RADIUS));  // Compute Hash
         particles.push_back(p);
     }
 
@@ -65,14 +63,14 @@ static void hash_map()
         pi.density = config::REST_DENSITY;
         pi.pressure = 0.0f;
 
-        vi3 cell = get_cell(pi, config::SMOOTHING_RADIUS);
+        vi3 cell_origin = cell(pi, config::SMOOTHING_RADIUS);
         for (s32 x = -1; x <= 1; x++) 
         {
             for (s32 y = -1; y <= 1; y++) 
             {
                 for (s32 z = -1; z <= 1; z++) 
                 {
-                    u32 cell_hash = hash(cell + vi3(x, y, z));
+                    u32 cell_hash = hash(cell_origin + vi3(x, y, z));
                     const auto& neighbors = particle_table[cell_hash];
                     for (u32 j : neighbors) 
                     {
@@ -106,7 +104,7 @@ static void unordered_map()
             rand.uniform(-0.5f, 0.0f),
         };
         // Compute hash
-        p.hash = hash(get_cell(p, config::SMOOTHING_RADIUS));
+        p.hash = hash(cell(p, config::SMOOTHING_RADIUS));
         particles.push_back(p);
     }
 
@@ -123,24 +121,23 @@ static void unordered_map()
     // Neighbor search
     for (auto& pi : particles) 
     {
-        vi3 cell = get_cell(pi, config::SMOOTHING_RADIUS);
+        vi3 cell_origin = cell(pi, config::SMOOTHING_RADIUS);
         for (s32 x = -1; x <= 1; x++)
         {
             for (s32 y = -1; y <= 1; y++) 
             {
                 for (s32 z = -1; z <= 1; z++) 
                 {
-                    u32 cell_hash = hash(cell + vi3(x, y, z));
+                    u32 cell_hash = hash(cell_origin + vi3(x, y, z));
                     auto it = particle_table.find(cell_hash);
                     if (it == particle_table.end()) continue;
 
-                    const auto& neighbor_indices = it->second;
-                    for (u32 j : neighbor_indices) {
+                    for (u32 j : it->second) {
                         const particle& pj = particles[j];
-                        if (&pi == &pj) continue;
+                        if (&pi == &pj || pj.hash != cell_hash) continue;
 
                         vf3 difference = pj.position - pi.position;
-                        f32 distance2 = glm::length2(difference);
+                        f32 distance2  = glm::length2(difference);
                         if (distance2 < config::SMOOTHING_RADIUS_2) {
                             pi.density += pj.mass * config::POLY6 * std::pow(config::SMOOTHING_RADIUS_2 - distance2, 3.0f);
                         }
@@ -168,7 +165,7 @@ static void precompute_neighbour()
             rand.uniform(-0.5f, 0.0f),
         };
         // Compute Hash
-        p.hash = hash(get_cell(p, config::SMOOTHING_RADIUS));
+        p.hash = hash(cell(p, config::SMOOTHING_RADIUS));
         particles.push_back(p);
     }
 
@@ -182,11 +179,11 @@ static void precompute_neighbour()
     // Precompute neighbor
     for (auto& pi : particles)
     {
-        vi3 cell = get_cell(pi, config::SMOOTHING_RADIUS);
+        vi3 cell_origin = cell(pi, config::SMOOTHING_RADIUS);
         for (s32 x = -1; x <= 1; x++) {
             for (s32 y = -1; y <= 1; y++) {
                 for (s32 z = -1; z <= 1; z++) {
-                    u32 cell_hash = hash(cell + vi3(x, y, z));
+                    u32 cell_hash = hash(cell_origin + vi3(x, y, z));
                     auto it = particle_table.find(cell_hash);
                     if (it == particle_table.end()) continue;
 
@@ -217,7 +214,7 @@ static void precompute_neighbour()
 }
 
 // Two nested for loop: O(n^2)
-static void naive_function()
+static void naive()
 {
     std::vector<particle> particles;
 

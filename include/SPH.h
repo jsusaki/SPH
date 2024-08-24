@@ -97,11 +97,11 @@ static const f32 PI = 3.14159265358979323846f;
 namespace config
 {
     // Simulation
-    static const s32 NUM_PARTICLES   = 5000;
+    static const s32 NUM_PARTICLES   = 15000;
     static const f32 REST_DENSITY    = 997.0f;
     static const f32 GAS_CONSTANT    = 1.0f;     // Gas Constant, or stiffness control the particle spread, make 5 to implode
     static const f32 VISCOSITY       = 0.0005f;
-    static const f32 SURFACE_TENSION_CONSTANT = 0.01f; // 0.0728f
+    static const f32 SURFACE_TENSION_CONSTANT = 0.0001f; // 0.0728f
     static const vf3 GRAVITY         = { 0.0f, -9.80665f, 0.0f };
     static const f32 MASS            = 0.01f;
     static const f32 DT              = 0.0001f;
@@ -168,7 +168,7 @@ public:
         fluid_particles.clear();
 
         s32 grid_size = static_cast<s32>(std::cbrt(config::NUM_PARTICLES));
-        f32 offset = 0.03f;
+        f32 offset = 0.02f;
         f32 half_grid_size = (grid_size - 1) * offset / 2.0f;
 
         for (s32 x = 0; x < grid_size; x++)
@@ -181,7 +181,7 @@ public:
                     particle p;
                     p.position = {
                         x * offset - half_grid_size,
-                        y * offset - half_grid_size + 0.25f,
+                        y * offset - half_grid_size + 0.15f,
                         z * offset - half_grid_size,
                     };
                     p.hash = hash(cell(p, config::SMOOTHING_RADIUS));
@@ -235,20 +235,20 @@ public:
             particle_table[current_hash].push_back(i);
         }
 
-        // Dynamic Grid Search
+        // Dynamics Spatial Grid Search
         for (auto& pi : fluid_particles)
         {
             pi.density = config::REST_DENSITY;
             pi.pressure = 0.0f;
 
-            vi3 cell = cell(pi, config::SMOOTHING_RADIUS);
+            vi3 cell_origin = cell(pi, config::SMOOTHING_RADIUS);
             for (s32 x = -1; x <= 1; x++)
             {
                 for (s32 y = -1; y <= 1; y++)
                 {
                     for (s32 z = -1; z <= 1; z++)
                     {
-                        u32 cell_hash = hash(cell + vi3(x, y, z));
+                        u32 cell_hash = hash(cell_origin + vi3(x, y, z));
                         const auto& neighbors = particle_table[cell_hash];
                         for (u32 j : neighbors)
                         {
@@ -275,7 +275,7 @@ public:
             vf3 normal = {};
             vf3 gravity_force = pi.mass * config::GRAVITY;
 
-            vi3 cell = cell(pi, config::SMOOTHING_RADIUS);
+            vi3 cell_origin = cell(pi, config::SMOOTHING_RADIUS);
 
             for (s32 x = -1; x <= 1; x++)
             {
@@ -283,7 +283,7 @@ public:
                 {
                     for (s32 z = -1; z <= 1; z++)
                     {
-                        u32 cell_hash = hash(cell + vi3(x, y, z));
+                        u32 cell_hash = hash(cell_origin + vi3(x, y, z));
                         const auto& neighbors = particle_table[cell_hash];
                         for (u32 j : neighbors)
                         {
@@ -325,14 +325,14 @@ public:
             pi.position += pi.velocity * dt;
             
             // Particle Collision
-            vi3 cell = cell(pi, config::SMOOTHING_RADIUS);
+            vi3 cell_origin = cell(pi, config::SMOOTHING_RADIUS);
             for (s32 x = -1; x <= 1; x++)
             {
                 for (s32 y = -1; y <= 1; y++)
                 {
                     for (s32 z = -1; z <= 1; z++)
                     {
-                        u32 cell_hash = hash(cell + vi3(x, y, z));
+                        u32 cell_hash = hash(cell_origin + vi3(x, y, z));
                         const auto& neighbors = particle_table[cell_hash];
                         for (u32 j : neighbors)
                         {

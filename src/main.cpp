@@ -263,8 +263,6 @@ private:
         glEnable(GL_DEPTH_TEST);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        // Set the line width
-        //glLineWidth(10.0f);
         // Enable Multisampling
         glEnable(GL_MULTISAMPLE);
         // Enable line smoothing and set the quality
@@ -330,6 +328,8 @@ public: // Helper functions
     }
 };
 
+
+
 void simulate()
 {
     Simulator sim;
@@ -338,6 +338,8 @@ void simulate()
     sim.ShutDown();
 }
 
+
+
 void test()
 {
     s32 n = 100;
@@ -345,11 +347,13 @@ void test()
     for (s32 i = 0; i < n; i++)
     {
         auto start = std::chrono::system_clock::now();
-        //naive_function();         // n=100 mean 41.5364ms
-        //hash_function();          // n=100 mean 5.0056ms
-        //hash_function_map();      // n=100 mean 4.7755ms
+
+        //naive();                  // n=100 mean 41.5364ms
+        //hash_map();               // n=100 mean 5.0056ms
+        //unordered_map();          // n=100 mean 4.7755ms
         //precompute_neighbour();   // n=100 mean 3.8802ms
-        auto end = std::chrono::system_clock::now();
+
+        auto end     = std::chrono::system_clock::now();
         auto elapsed = std::chrono::duration<f64, std::milli>(end - start);
         runtimes.push_back(elapsed.count());
     }
@@ -361,7 +365,7 @@ void test()
 }
 
 
-#define TEST 0
+#define TEST 1
 
 int main()
 {
