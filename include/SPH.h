@@ -101,7 +101,7 @@ namespace config
     static const f32 REST_DENSITY    = 997.0f;
     static const f32 GAS_CONSTANT    = 1.0f;     // Gas Constant, or stiffness control the particle spread, make 5 to implode
     static const f32 VISCOSITY       = 0.0005f;
-    static const f32 SURFACE_TENSION_CONSTANT = 0.0001f; // 0.0728f
+    static const f32 SURFACE_TENSION_CONSTANT = 0.01f; // 0.0728f
     static const vf3 GRAVITY         = { 0.0f, -9.80665f, 0.0f };
     static const f32 MASS            = 0.01f;
     static const f32 DT              = 0.0001f;
@@ -147,17 +147,16 @@ public:
         vf3 surface_tension = { 0.0f, 0.0f, 0.0f };
 
         u32 hash = 0;
-        //std::vector<u32> neighbors;
-        //std::vector<particle*> neighbors;
     };
 
-    vi3 get_cell(const SPH::particle& p, f32 h) { return { p.position.x / h, p.position.y / h, p.position.z / h }; }
+private: // Hash map
+    std::vector<std::vector<u32>> particle_table;
+    vi3 cell(const particle& p, f32 h) { return { p.position.x / h, p.position.y / h, p.position.z / h }; }
     u32 hash(const vi3& cell) { return ((u32)(cell.x * 73856093) ^ (u32)(cell.y * 19349663) ^ (u32)(cell.z * 83492791)) % config::TABLE_SIZE; }
 
 private:
     std::vector<particle> fluid_particles;
     std::vector<particle> boundary_particles;
-    std::vector<std::vector<u32>> particle_table;
 
 public:
     SPH() { Init(); }
@@ -185,7 +184,7 @@ public:
                         y * offset - half_grid_size + 0.25f,
                         z * offset - half_grid_size,
                     };
-                    p.hash = hash(get_cell(p, config::SMOOTHING_RADIUS));
+                    p.hash = hash(cell(p, config::SMOOTHING_RADIUS));
                     fluid_particles.push_back(p);
                 }
 
@@ -223,7 +222,7 @@ public:
     {
         // Compute hash
         for (auto& p : fluid_particles)
-            p.hash = hash(get_cell(p, config::SMOOTHING_RADIUS));
+            p.hash = hash(cell(p, config::SMOOTHING_RADIUS));
 
         // Sort Particles
         std::sort(fluid_particles.begin(), fluid_particles.end(), [&](const particle& i, const particle& j) { return i.hash < j.hash; });
@@ -242,7 +241,7 @@ public:
             pi.density = config::REST_DENSITY;
             pi.pressure = 0.0f;
 
-            vi3 cell = get_cell(pi, config::SMOOTHING_RADIUS);
+            vi3 cell = cell(pi, config::SMOOTHING_RADIUS);
             for (s32 x = -1; x <= 1; x++)
             {
                 for (s32 y = -1; y <= 1; y++)
@@ -276,7 +275,7 @@ public:
             vf3 normal = {};
             vf3 gravity_force = pi.mass * config::GRAVITY;
 
-            vi3 cell = get_cell(pi, config::SMOOTHING_RADIUS);
+            vi3 cell = cell(pi, config::SMOOTHING_RADIUS);
 
             for (s32 x = -1; x <= 1; x++)
             {
@@ -326,7 +325,7 @@ public:
             pi.position += pi.velocity * dt;
             
             // Particle Collision
-            vi3 cell = get_cell(pi, config::SMOOTHING_RADIUS);
+            vi3 cell = cell(pi, config::SMOOTHING_RADIUS);
             for (s32 x = -1; x <= 1; x++)
             {
                 for (s32 y = -1; y <= 1; y++)

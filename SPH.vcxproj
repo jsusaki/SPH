@@ -316,16 +316,14 @@
     <ClInclude Include="lib\glm\vec3.hpp" />
     <ClInclude Include="lib\glm\vec4.hpp" />
     <ClInclude Include="lib\glm\vector_relational.hpp" />
-    <ClInclude Include="lib\stb\stb_image.h" />
+    <ClInclude Include="test\Test.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="lib\glad\src\glad.c" />
     <ClCompile Include="lib\glm\detail\glm.cpp" />
-    <ClCompile Include="lib\stb\stb_image.cpp" />
     <ClCompile Include="src\Camera.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Shader.cpp" />
-    <ClCompile Include="test\Test.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="lib\glm\detail\func_common.inl" />
@@ -521,28 +519,31 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>D:\dev\projects\OpenGL_SPH\OpenGL_SPH\lib\glad\include;D:\dev\projects\OpenGL_SPH\OpenGL_SPH\lib\glfw\include;D:\dev\projects\OpenGL_SPH\OpenGL_SPH\lib;D:\dev\projects\OpenGL_SPH\OpenGL_SPH\include;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\dev\projects\OpenGL_SPH\OpenGL_SPH\lib\glfw\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>D:\git\projects\SPH\SPH\lib\glad\include;D:\git\projects\SPH\SPH\lib\glfw\include;D:\git\projects\SPH\SPH\lib;D:\git\projects\SPH\SPH\include;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\git\projects\SPH\SPH\lib\glfw\lib;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)build\bin</OutDir>
     <IntDir>$(SolutionDir)build\obj</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>D:\dev\projects\OpenGL_SPH\OpenGL_SPH\lib\glad\include;D:\dev\projects\OpenGL_SPH\OpenGL_SPH\lib\glfw\include;D:\dev\projects\OpenGL_SPH\OpenGL_SPH\lib;D:\dev\projects\OpenGL_SPH\OpenGL_SPH\include;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\dev\projects\OpenGL_SPH\OpenGL_SPH\lib\glfw\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>D:\git\projects\SPH\SPH\lib\glad\include;D:\git\projects\SPH\SPH\lib\glfw\include;D:\git\projects\SPH\SPH\lib;D:\git\projects\SPH\SPH\include;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\git\projects\SPH\SPH\lib\glfw\lib;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)build\bin</OutDir>
     <IntDir>$(SolutionDir)build\obj</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>D:\dev\projects\OpenGL_SPH\OpenGL_SPH\lib\glad\include;D:\dev\projects\OpenGL_SPH\OpenGL_SPH\lib\glfw\include;D:\dev\projects\OpenGL_SPH\OpenGL_SPH\lib;D:\dev\projects\OpenGL_SPH\OpenGL_SPH\include;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\dev\projects\OpenGL_SPH\OpenGL_SPH\lib\glfw\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>D:\git\projects\SPH\SPH\lib\glad\include;D:\git\projects\SPH\SPH\lib\glfw\include;D:\git\projects\SPH\SPH\lib;D:\git\projects\SPH\SPH\include;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\git\projects\SPH\SPH\lib\glfw\lib;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)build\bin</OutDir>
     <IntDir>$(SolutionDir)build\obj</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>D:\dev\projects\OpenGL_SPH\OpenGL_SPH\lib\glad\include;D:\dev\projects\OpenGL_SPH\OpenGL_SPH\lib\glfw\include;D:\dev\projects\OpenGL_SPH\OpenGL_SPH\lib;D:\dev\projects\OpenGL_SPH\OpenGL_SPH\include;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\dev\projects\OpenGL_SPH\OpenGL_SPH\lib\glfw\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>D:\git\projects\SPH\SPH\lib\glad\include;D:\git\projects\SPH\SPH\lib\glfw\include;D:\git\projects\SPH\SPH\lib;D:\git\projects\SPH\SPH\include;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\git\projects\SPH\SPH\lib\glfw\lib;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)build\bin</OutDir>
     <IntDir>$(SolutionDir)build\obj</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Label="Vcpkg">
+    <VcpkgEnabled>false</VcpkgEnabled>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

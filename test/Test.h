@@ -33,7 +33,7 @@ static vi3 get_cell(const particle& p, f32 h) { return { p.position.x / h, p.pos
 static u32 hash(const vi3& cell) { return ((u32)(cell.x * 73856093) ^ (u32)(cell.y * 19349663) ^ (u32)(cell.z * 83492791)) % TABLE_SIZE; }
 
 // hash_map: O(nm)
-static void hash_function()
+static void hash_map()
 {
     std::vector<particle> particles;
     particles.reserve(config::NUM_PARTICLES);
@@ -92,7 +92,7 @@ static void hash_function()
 }
 
 // unordered_map: O(nm)
-static void hash_function_map()
+static void unordered_map()
 {
     std::vector<particle> particles;
     particles.reserve(config::NUM_PARTICLES);
