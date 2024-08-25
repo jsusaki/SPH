@@ -27,6 +27,7 @@
     <ClInclude Include="include\Random.h" />
     <ClInclude Include="include\Shader.h" />
     <ClInclude Include="include\SPH.h" />
+    <ClInclude Include="include\Window.h" />
     <ClInclude Include="lib\glad\include\glad\glad.h" />
     <ClInclude Include="lib\glad\include\KHR\khrplatform.h" />
     <ClInclude Include="lib\glfw\include\glfw3.h" />

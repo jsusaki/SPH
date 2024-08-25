@@ -3,9 +3,6 @@
 #include <chrono>
 #include <algorithm>
 
-#include <glad/glad.h>
-#include <glfw3.h>
-
 #include "Common.h"
 #include "Random.h"
 #include "SPH.h"
@@ -13,41 +10,20 @@
 #include "Shader.h"
 #include "Camera.h"
 #include "Mesh.h"
+#include "Window.h"
 #include "Input.h"
 
 #include "../test/Test.h"
 
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
-{
-    glViewport(0, 0, width, height);
-}
-
-
 class Simulator
 {
 public:
-    Simulator() {}
+    Simulator(): window("SPH Simulator", SCREEN_WIDTH, SCREEN_HEIGHT) {}
 
 public:
     bool Init()
     {
-        glfwInit();
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-        glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
-        std::println("INFO: GLFW {}.{}.{}", GLFW_VERSION_MAJOR, GLFW_VERSION_MINOR, GLFW_VERSION_REVISION);
-
-        m_window = CreateWindow("SPH Simulator", SCREEN_WIDTH, SCREEN_HEIGHT);
-
-        if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-        {
-            std::println("ERROR: GLAD Initialization Failed");
-            glfwTerminate();
-        }
-
         // Create user resources
         Create();
 
@@ -67,18 +43,18 @@ public:
 
     bool Start()
     {
-        while (!glfwWindowShouldClose(m_window))
+        while (!window.ShouldClose())
         {
             // Poll events
-            glfwPollEvents();
+            window.PollEvents();
 
             // Handle timing
             m_t2 = std::chrono::system_clock::now();
-            std::chrono::duration<f32> elapsedTime = m_t2 - m_t1;
+            std::chrono::duration<f32> elapsed_time = m_t2 - m_t1;
             m_t1 = m_t2;
 
             // Compute elapsed time
-            m_elapsed_time = elapsedTime.count();
+            m_elapsed_time = elapsed_time.count();
             m_last_elapsed_time = m_elapsed_time;
 
             // Handle input
@@ -104,7 +80,7 @@ public:
 
     bool ShutDown()
     {
-        glfwTerminate();
+        window.Close();
         return true;
     }
 
@@ -121,7 +97,7 @@ private: // Simulator variables
     f32 m_last_elapsed_time;
 
     // Window
-    GLFWwindow* m_window;
+    Window window;
 
     // Input
     vf2 mouse_pos;
@@ -141,7 +117,6 @@ private: // Simulation variables
     f32 far    = 100.0f;
     f32 near   = 0.1f;
 
-
     // Graphics
     std::shared_ptr<Shader> shader;
     std::vector<model> particle_models;
@@ -157,6 +132,7 @@ private:
     void Create()
     {
         camera   = std::make_shared<ArcballCamera>(eye, center, up);
+        // TODO: incorporate proj and proj_inv into camera
         proj     = glm::perspective(glm::radians(fov), static_cast<float>(SCREEN_WIDTH) / SCREEN_HEIGHT, near, far);
         proj_inv = glm::inverse(proj);
 
@@ -182,9 +158,9 @@ private:
 
     void ProcessInput()
     {
-        // Key Control
+        // Key control
         if (input.IsKeyPressed(GLFW_KEY_ESCAPE))
-            glfwSetWindowShouldClose(m_window, true);
+            window.SetShouldClose();
 
         if (input.IsKeyPressed(GLFW_KEY_SPACE))
             simulate = !simulate;
@@ -205,6 +181,7 @@ private:
             }
             if (input.IsButtonPressed(GLFW_MOUSE_BUTTON_RIGHT))
             {
+                // TODO: incorporate into camera
                 vf2 dxy  = mouse_pos - prev_mouse_pos;
                 vf4 dxy4 = proj_inv * vf4(dxy.x, dxy.y, 0.0f, 1.0f);
                 camera->pan(vf2(dxy4.x, dxy4.y));
@@ -248,23 +225,21 @@ private:
 
     void Render()
     {
-        Clear({ 25, 25, 25, 255 });
+        window.Clear({ 25, 25, 25, 255 });
 
+        // Rendering 
         glEnable(GL_BLEND);
         glEnable(GL_DEPTH_TEST);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-        // Enable Multisampling
         glEnable(GL_MULTISAMPLE);
-        // Enable line smoothing and set the quality
         glEnable(GL_LINE_SMOOTH);
         glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
-        // Enable polygon smoothing and set the quality
         glEnable(GL_POLYGON_SMOOTH);
         glHint(GL_POLYGON_SMOOTH_HINT, GL_NICEST);
 
         // Draw
         shader->Use();
+        // TODO: camera get projection
         shader->SetUniform("proj_view", proj * camera->transform());
 
         for (auto& particle_model : particle_models)
@@ -275,31 +250,10 @@ private:
 
         shader->Unuse();
 
-        glfwSwapBuffers(m_window);
+        window.SwapBuffers();
     }
 
 public: // Helper functions
-    GLFWwindow* CreateWindow(const char* title, s32 width, s32 height)
-    {
-        GLFWwindow* window = glfwCreateWindow(width, height, title, nullptr, nullptr);
-        if (window == nullptr)
-        {
-            std::println("ERROR: Failed to create GLFW window");
-            glfwTerminate();
-            return nullptr;
-        }
-
-        glfwMakeContextCurrent(window);
-
-        glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-        glfwSetKeyCallback(window, key_callback);
-        glfwSetMouseButtonCallback(window, mouse_button_callback);
-        glfwSetCursorPosCallback(window, cursor_position_callback);
-        glfwSetScrollCallback(window, scroll_callback);
-
-        return window;
-    }
-
     void UpdateFrameTime()
     {
         m_frame_timer += m_elapsed_time;
@@ -308,17 +262,11 @@ public: // Helper functions
         {
             m_last_fps = m_frame_count;
             m_frame_timer -= 1.0f;
-            std::println("Frame Time: {:.4f} FPS: {}", m_elapsed_time, m_frame_count);
+            std::println("INFO: Frame Time: {:.4f} FPS: {}", m_elapsed_time, m_frame_count);
             m_frame_count = 0;
         }
     }
 
-    void Clear(const ucolor uc)
-    {
-        fcolor fc = to_float(uc);
-        glClearColor(fc.r, fc.g, fc.b, fc.a);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    }
 };
 
 void simulate()
