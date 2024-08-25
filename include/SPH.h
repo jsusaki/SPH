@@ -97,7 +97,7 @@ static const f32 PI = 3.14159265358979323846f;
 namespace config
 {
     // Simulation
-    static const s32 NUM_PARTICLES   = 15000;
+    static const s32 NUM_PARTICLES   = 5000;
     static const f32 REST_DENSITY    = 997.0f;
     static const f32 GAS_CONSTANT    = 1.0f;     // Gas Constant, or stiffness control the particle spread, make 5 to implode
     static const f32 VISCOSITY       = 0.0005f;
@@ -117,17 +117,14 @@ namespace config
     // Boundary
     static const f32 BOUNDARY_EPS     = 0.0000001f;
     static const f32 BOUNDARY_DAMPING = -0.3f;
-    static const f32 BOUNDARY_WIDTH   = 0.5f;
-    static const f32 BOUNDARY_HEIGHT  = 0.5f;
-    static const f32 BOUNDARY_DEPTH   = 0.5f;
-    static const vf3 BOUNDARY_MIN     = {-BOUNDARY_WIDTH,-BOUNDARY_HEIGHT,-BOUNDARY_DEPTH };
-    static const vf3 BOUNDARY_MAX     = { BOUNDARY_WIDTH, BOUNDARY_HEIGHT, BOUNDARY_DEPTH };
+    static const vf3 BOUNDARY         = { 0.75f, 0.75f, 0.75f };
+    static const vf3 BOUNDARY_MIN     = -BOUNDARY;
+    static const vf3 BOUNDARY_MAX     = BOUNDARY;
 
     // Grid-based hash neighbour search algorithm
-    const u32 TABLE_SIZE = 262144;
+    const u32 TABLE_SIZE  = 262144;
     const u32 NO_PARTICLE = 0xFFFFFFFF;
 }
-
 
 class SPH
 {
@@ -149,14 +146,14 @@ public:
         u32 hash = 0;
     };
 
+private:
+    std::vector<particle> fluid_particles;
+    //std::vector<particle> boundary_particles;
+
 private: // Hash map
     std::vector<std::vector<u32>> particle_table;
     vi3 cell(const particle& p, f32 h) { return { p.position.x / h, p.position.y / h, p.position.z / h }; }
     u32 hash(const vi3& cell) { return ((u32)(cell.x * 73856093) ^ (u32)(cell.y * 19349663) ^ (u32)(cell.z * 83492791)) % config::TABLE_SIZE; }
-
-private:
-    std::vector<particle> fluid_particles;
-    std::vector<particle> boundary_particles;
 
 public:
     SPH() { Init(); }
@@ -167,8 +164,8 @@ public:
         // Initialize Fluid Particles
         fluid_particles.clear();
 
-        s32 grid_size = static_cast<s32>(std::cbrt(config::NUM_PARTICLES));
-        f32 offset = 0.02f;
+        s32 grid_size      = static_cast<s32>(std::cbrt(config::NUM_PARTICLES));
+        f32 offset         = 0.0325f;
         f32 half_grid_size = (grid_size - 1) * offset / 2.0f;
 
         for (s32 x = 0; x < grid_size; x++)
@@ -235,7 +232,9 @@ public:
             particle_table[current_hash].push_back(i);
         }
 
-        // Dynamics Spatial Grid Search
+        //TODO: Precompute neighbor with search?
+
+        // Dynamic Spatial Grid Search
         for (auto& pi : fluid_particles)
         {
             pi.density = config::REST_DENSITY;
@@ -253,7 +252,10 @@ public:
                         for (u32 j : neighbors)
                         {
                             const particle& pj = fluid_particles[j];
-                            if (&pi == &pj || cell_hash != pj.hash) continue;
+
+                            if (&pi == &pj || cell_hash != pj.hash) 
+                                continue;
+                            
                             f32 distance2 = glm::distance2(pj.position, pi.position);
                             if (distance2 < config::SMOOTHING_RADIUS_2)
                             {
@@ -288,22 +290,22 @@ public:
                         for (u32 j : neighbors)
                         {
                             const particle& pj = fluid_particles[j];
-                            if (&pi == &pj || pj.hash != cell_hash) continue;
+
+                            if (&pi == &pj || pj.hash != cell_hash) 
+                                continue;
 
                             vf3 difference = pj.position - pi.position;
-                            f32 distance2 = glm::length2(difference);
+                            f32 distance2  = glm::length2(difference);
                             if (distance2 < config::SMOOTHING_RADIUS_2)
                             {
-                                f32 distance = std::sqrt(distance2);
+                                f32 distance  = std::sqrt(distance2);
                                 vf3 direction = glm::normalize(difference);
 
                                 pressure_force += -direction * pj.mass * (pi.pressure + pj.pressure) / (2.0f * pj.density) * config::SPIKY * std::pow(config::SMOOTHING_RADIUS - distance, 3.0f);
-                                viscous_force += pj.mass * config::VISCOSITY * (pj.velocity - pi.velocity) / pj.density * config::LAPLACIAN * (config::SMOOTHING_RADIUS - distance);
-
-                                normal += direction * pj.mass / pj.density * config::SPIKY * std::pow(config::SMOOTHING_RADIUS - distance, 2.0f);
+                                viscous_force  +=  pj.mass * config::VISCOSITY * (pj.velocity - pi.velocity) / pj.density * config::LAPLACIAN * (config::SMOOTHING_RADIUS - distance);
+                                normal         +=  direction * pj.mass / pj.density * config::SPIKY * std::pow(config::SMOOTHING_RADIUS - distance, 2.0f);
                             }
                         }
-
                     }
                 }
             }
@@ -337,9 +339,12 @@ public:
                         for (u32 j : neighbors)
                         {
                             const particle& pj = fluid_particles[j];
-                            if (&pi == &pj || pj.hash != cell_hash) continue;
+
+                            if (&pi == &pj || pj.hash != cell_hash) 
+                                continue;
+
                             vf3 difference = pj.position - pi.position;
-                            f32 distance2 = glm::length2(difference);
+                            f32 distance2  = glm::length2(difference);
                             if (distance2 < 0.0f)
                             {
                                 f32 distance = std::sqrt(distance2);

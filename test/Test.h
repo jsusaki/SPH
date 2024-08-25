@@ -58,7 +58,7 @@ static void hash_map()
         particle_table[current_hash].push_back(i);
     }
 
-    // Neighbor Search
+    // Neighborhood Search
     for (auto& pi : particles) {
         pi.density = config::REST_DENSITY;
         pi.pressure = 0.0f;
@@ -150,7 +150,7 @@ static void unordered_map()
     }
 }
 
-static void precompute_neighbour()
+static void precompute_neighbor()
 {
     std::vector<particle> particles;
     particles.reserve(config::NUM_PARTICLES);
@@ -169,11 +169,11 @@ static void precompute_neighbour()
         particles.push_back(p);
     }
 
-    std::unordered_map<u32, u32> particle_table;
-    for (u32 i = 0; i < particles.size(); i++)
-    {
+    // Create Neighbor Table (storing indices of particles)
+    std::unordered_map<u32, std::vector<u32>> particle_table;
+    for (u32 i = 0; i < particles.size(); i++) {
         u32 current_hash = particles[i].hash;
-        particle_table[current_hash] = i;
+        particle_table[current_hash].push_back(i);
     }
 
     // Precompute neighbor
@@ -187,13 +187,15 @@ static void precompute_neighbour()
                     auto it = particle_table.find(cell_hash);
                     if (it == particle_table.end()) continue;
 
-                    const particle& pj = particles[it->second];
-
-                    if (&pi == &pj || pj.hash != cell_hash) continue;
-                    vf3 difference = pj.position - pi.position;
-                    f32 distance2 = glm::length2(difference);
-                    if (distance2 < config::SMOOTHING_RADIUS_2) {
-                        pi.neighbors.push_back(it->second);
+                    //(something is sus here...)
+                    for (u32 j : it->second) {
+                        const particle& pj = particles[j];
+                        if (&pi == &pj || pj.hash != cell_hash) continue;
+                        vf3 difference = pj.position - pi.position;
+                        f32 distance2 = glm::length2(difference);
+                        if (distance2 < config::SMOOTHING_RADIUS_2) {
+                            pi.neighbors.push_back(j);
+                        }
                     }
                 }
             }

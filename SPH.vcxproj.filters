@@ -909,6 +909,9 @@
     <ClInclude Include="test\Test.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\Input.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="lib\glad\src\glad.c">

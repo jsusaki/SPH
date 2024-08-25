@@ -13,6 +13,7 @@
 #include "Shader.h"
 #include "Camera.h"
 #include "Mesh.h"
+#include "Input.h"
 
 #include "../test/Test.h"
 
@@ -22,17 +23,6 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
     glViewport(0, 0, width, height);
 }
 
-void scroll_callback(GLFWwindow* window, f64 dx, f64 dy)
-{
-    f32* mouse_wheel_delta = static_cast<f32*>(glfwGetWindowUserPointer(window));
-    for (u32 i = 0; i < std::abs(dy); i++)
-    {
-        if (dy > 0)
-            (*mouse_wheel_delta) += 1.0f;
-        else if (dy < 0)
-            (*mouse_wheel_delta) -= 1.0f;
-    }
-}
 
 class Simulator
 {
@@ -134,10 +124,8 @@ private: // Simulator variables
     GLFWwindow* m_window;
 
     // Input
-    vf2 mouse_pos        = { -2.0f,-2.0f };
-    vd2 mouse_pos_screen = { -2.0f,-2.0f }; // double precision req for glfw
-    vf2 prev_mouse_pos   = { -2.0f,-2.0f };
-    f32 mouse_wheel_delta = 0.0f;           // zoom control
+    vf2 mouse_pos;
+    vf2 prev_mouse_pos;
 
 private: // Simulation variables
     // Camera
@@ -163,12 +151,13 @@ private: // Simulation variables
     SPH sph;
     bool simulate = false;
     bool reset    = false;
+    bool step     = false;
 
 private:
     void Create()
     {
-        camera = std::make_shared<ArcballCamera>(eye, center, up);
-        proj = glm::perspective(glm::radians(fov), static_cast<float>(SCREEN_WIDTH) / SCREEN_HEIGHT, near, far);
+        camera   = std::make_shared<ArcballCamera>(eye, center, up);
+        proj     = glm::perspective(glm::radians(fov), static_cast<float>(SCREEN_WIDTH) / SCREEN_HEIGHT, near, far);
         proj_inv = glm::inverse(proj);
 
         // Create Particle Models
@@ -184,7 +173,7 @@ private:
  
         // Create Bounding Box Model
         model cube_model = model(cube());
-        cube_model.scale({ config::BOUNDARY_WIDTH, config::BOUNDARY_HEIGHT, config::BOUNDARY_DEPTH });
+        cube_model.scale({ config::BOUNDARY.x, config::BOUNDARY.y, config::BOUNDARY.z });
         boundary_models.push_back(cube_model);
 
         // Create Shader
@@ -194,64 +183,66 @@ private:
     void ProcessInput()
     {
         // Key Control
-        if (glfwGetKey(m_window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+        if (input.IsKeyPressed(GLFW_KEY_ESCAPE))
             glfwSetWindowShouldClose(m_window, true);
-        if (glfwGetKey(m_window, GLFW_KEY_SPACE) == GLFW_PRESS)
-            simulate = true;
-        if (glfwGetKey(m_window, GLFW_KEY_R) == GLFW_PRESS)
+
+        if (input.IsKeyPressed(GLFW_KEY_SPACE))
+            simulate = !simulate;
+
+        if (input.IsKeyHeld(GLFW_KEY_S))
+            step = true;
+
+        if (input.IsKeyPressed(GLFW_KEY_R))
             reset = true;
 
         // Mouse control
-        glfwGetCursorPos(m_window, &mouse_pos_screen.x, &mouse_pos_screen.y);
-        mouse_pos = transform_mouse(mouse_pos_screen);
+        mouse_pos = transform_mouse(input.mouse_pos);
         if (prev_mouse_pos != (vf2(-2.0f)))
         {
-            if (glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
+            if (input.IsButtonPressed(GLFW_MOUSE_BUTTON_LEFT))
             {
                 camera->rotate(prev_mouse_pos, mouse_pos);
             }
-            else if (glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS)
+            if (input.IsButtonPressed(GLFW_MOUSE_BUTTON_RIGHT))
             {
                 vf2 dxy  = mouse_pos - prev_mouse_pos;
                 vf4 dxy4 = proj_inv * vf4(dxy.x, dxy.y, 0.0f, 1.0f);
                 camera->pan(vf2(dxy4.x, dxy4.y));
             }
         }
-
         prev_mouse_pos = mouse_pos;
 
-        if (mouse_wheel_delta != 0)
+        if (input.mouse_wheel_delta != 0)
         {
-            camera->zoom(mouse_wheel_delta * 0.1f);
-            mouse_wheel_delta = 0;
+            camera->zoom(input.mouse_wheel_delta * 0.1f);
+            input.mouse_wheel_delta = 0;
         }
-
 
         // Window resized event
         //proj = glm::perspective(glm::radians(65.0f), static_cast<float>(SCREEN_WIDTH) / SCREEN_HEIGHT, 0.1f, 500.0f);
+
+        input.Update();
     }
 
     void Simulate(f32 dt)
     {
-        // SPH reset simulation
         if (reset)
         {
             sph.Init();
             std::vector<SPH::particle>& particles = sph.GetParticles();
             for (s32 i = 0; i < particles.size(); i++)
                 particle_models[i].translate(particles[i].position);
-            simulate = true; // Simulate one step
             reset    = false;
+            simulate = false;
         }
 
-        // SPH Step simulation
-        if (simulate)
+        if (simulate || step)
         {
             sph.Simulate(dt);
             std::vector<SPH::particle>& particles = sph.GetParticles();
             for (s32 i = 0; i < particles.size(); i++)
                 particle_models[i].translate(particles[i].position);
-            simulate = false;
+            if (step) step = false;
         }
     }
 
@@ -301,8 +292,10 @@ public: // Helper functions
         glfwMakeContextCurrent(window);
 
         glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+        glfwSetKeyCallback(window, key_callback);
+        glfwSetMouseButtonCallback(window, mouse_button_callback);
+        glfwSetCursorPosCallback(window, cursor_position_callback);
         glfwSetScrollCallback(window, scroll_callback);
-        glfwSetWindowUserPointer(window, &mouse_wheel_delta);
 
         return window;
     }
@@ -328,8 +321,6 @@ public: // Helper functions
     }
 };
 
-
-
 void simulate()
 {
     Simulator sim;
@@ -337,8 +328,6 @@ void simulate()
         sim.Start();
     sim.ShutDown();
 }
-
-
 
 void test()
 {
@@ -351,7 +340,7 @@ void test()
         //naive();                  // n=100 mean 41.5364ms
         //hash_map();               // n=100 mean 5.0056ms
         //unordered_map();          // n=100 mean 4.7755ms
-        //precompute_neighbour();   // n=100 mean 3.8802ms
+        precompute_neighbor();   // n=100 mean 3.8802ms 
 
         auto end     = std::chrono::system_clock::now();
         auto elapsed = std::chrono::duration<f64, std::milli>(end - start);
@@ -364,8 +353,9 @@ void test()
     std::println("n={} mean {:.4f}ms", n, mean_elapsed_time);
 }
 
+// TODO: REVIEW neighborhood search functions
 
-#define TEST 1
+#define TEST 0
 
 int main()
 {
