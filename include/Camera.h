@@ -4,36 +4,41 @@
 class ArcballCamera
 {
 public:
-    // Create an arcball camera focused on some center point screen: [win_width, win_height]
-    ArcballCamera(const vf3& eye, const vf3& center, const vf3& up);
+    ArcballCamera(const vf3& eye, const vf3& center, const vf3& up, f32 fov, f32 aspect, f32 near, f32 far);
 public:
-    // Rotate the camera from the previous mouse position to the current one. Mouse positions should be in normalized device coordinates
+    void init(const vf3& eye, const vf3& center, const vf3& up);
+
     void rotate(vf2 prev_mouse, vf2 cur_mouse);
-    // Pan the camera given the translation vector. Mouse delta amount should be in normalized device coordinates
     void pan(vf2 mouse_delta);
-    // Zoom the camera given the zoom amount to (i.e., the scroll amount). Positive values zoom in, negative will zoom out.
     void zoom(const f32 zoom_amount);
-    // Get the camera transformation matrix
+    void translate(vf3 position);
+
     const mf4x4& transform() const;
-    // Get the camera's inverse transformation matrix
     const mf4x4& inv_transform() const;
-    // Get the eye position of the camera in world space
+    const mf4x4& projection() const;
+    const mf4x4& inv_projection() const;
+    const mf4x4 proj_camera() const;
+
     vf3 eye() const;
-    // Get the eye direction of the camera in world space
     vf3 dir() const;
-    // Get the up direction of the camera in world space
     vf3 up() const;
+
 private:
+    void update_projection(f32 fov, f32 aspect, f32 near, f32 far);
     void update_camera();
+
 private:
-    // We store the unmodified look at matrix along with decomposed translation and rotation components
     mf4x4 center_translation;
     mf4x4 translation;
     qf32  rotation;
-    // Camera is the full camera transform, inv_camera is stored as well to easily compute eye position and world space rotation axes
+
     mf4x4 camera;
     mf4x4 inv_camera;
+    mf4x4 proj;
+    mf4x4 inv_proj;
 
-    // projection matrix
-    // view matrix
+    f32 field_of_view;
+    f32 aspect_ratio;
+    f32 near_plane;
+    f32 far_plane;
 };

@@ -1,52 +1,69 @@
 #pragma once
 
 #include <array>
+#include "Common.h"
 
-struct Input
+class Input
 {
-    static const s32 MAX_KEYS = 257;
-    static const s32 MAX_BUTTONS = 5;
+public: // TODO: instead of singleton make it static functions
+    static Input& Instance()
+    {
+        static Input instance;
+        return instance;
+    }
 
-    std::array<bool, MAX_KEYS>    keys      = {};
-    std::array<bool, MAX_KEYS>    prev_keys = {};
-    std::array<bool, MAX_BUTTONS> buttons   = {};
+    Input(const Input&) = delete;
+    void operator=(const Input&) = delete;
 
-    vf2 mouse_pos         = {};
-    vf2 prev_mouse_pos    = {};
+    inline void SetKey(const s32 key, const bool pressed) { prev_keys[key] = keys[key]; keys[key] = pressed; }
+    inline void SetButton(const s32 button, const bool pressed) { buttons[button] = pressed; }
+    inline bool IsKeyPressed(const s32 key) const { return keys[key] && !prev_keys[key]; }
+    inline bool IsKeyHeld(const s32 key) const { return keys[key]; }
+    inline bool IsKeyReleased(const s32 key) const { return !keys[key] && prev_keys[key]; }
+    inline bool IsButtonPressed(const s32 button) const { return buttons[button]; }
+    inline void SetMousePos(const f64 x, const f64 y) { prev_mouse_pos = mouse_pos; mouse_pos = { static_cast<f32>(x), static_cast<f32>(y) }; }
+    inline void SetMouseWheelDelta(const f32 delta) { mouse_wheel_delta += delta; }
+    inline void Update() { prev_keys = keys; }
+
+    vf2 mouse_pos = {};
+    vf2 prev_mouse_pos = {};
     f32 mouse_wheel_delta = 0.0f;
 
-    void SetKey(s32 key, bool pressed) { prev_keys[key] = keys[key]; keys[key] = pressed; }
-    void SetButton(s32 button, bool pressed) { buttons[button] = pressed; }
-    bool IsKeyPressed(s32 key) { return keys[key] && !prev_keys[key]; }
-    bool IsKeyHeld(s32 key) { return keys[key]; }
-    bool IsKeyReleased(s32 key) { return !keys[key] && prev_keys[key]; }
-    bool IsButtonPressed(s32 button) { return buttons[button]; }
-    void SetMousePos(f64 x, f64 y) { prev_mouse_pos = mouse_pos; mouse_pos = { static_cast<f32>(x), static_cast<f32>(y) }; }
-    void SetMouseWheelDelta(f32 delta) { mouse_wheel_delta += delta; }
-    void Update() { prev_keys = keys; }
+private:
+    Input() = default;
+
+    static const s32 MAX_KEYS = 257;
+    static const s32 MAX_BUTTONS = 5;
+    
+    std::array<bool, MAX_KEYS>    keys = {};
+    std::array<bool, MAX_KEYS>    prev_keys = {};
+    std::array<bool, MAX_BUTTONS> buttons = {};
+
 };
 
-static Input input;
-
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
+    Input& input = Input::Instance();
     if (action == GLFW_PRESS)        input.SetKey(key, true);
     else if (action == GLFW_RELEASE) input.SetKey(key, false);
 }
 
-void cursor_position_callback(GLFWwindow* window, f64 x, f64 y)
+static void cursor_position_callback(GLFWwindow* window, f64 x, f64 y)
 {
+    Input& input = Input::Instance();
     input.SetMousePos(x, y);
 }
 
-void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
+static void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 {
-    if (action == GLFW_PRESS) input.SetButton(button, true);
+    Input& input = Input::Instance();
+    if (action == GLFW_PRESS)        input.SetButton(button, true);
     else if (action == GLFW_RELEASE) input.SetButton(button, false);
 }
 
-void scroll_callback(GLFWwindow* window, f64 dx, f64 dy)
+static void scroll_callback(GLFWwindow* window, f64 dx, f64 dy)
 {
+    Input& input = Input::Instance();
     for (u32 i = 0; i < std::abs(dy); i++)
     {
         if (dy > 0)      input.SetMouseWheelDelta(static_cast<f32>(1.0f));

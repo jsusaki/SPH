@@ -1,11 +1,15 @@
 #pragma once
+
+#include <algorithm>
+#include <vector>
+
 #include "Common.h"
 
 // float 32-bit Color 
 // TODO: vf4
 struct fcolor
 {
-	f32 r; f32 g; f32 b; f32 a;
+	f32 r, g, b, a;
 };
 
 // uint 32-bit Color 
@@ -16,16 +20,12 @@ struct ucolor
 	ucolor(u8 r, u8 g, u8 b, u8 a = 0xFF) : r(r), g(g), b(b), a(a) {}
 };
 
-fcolor to_float(const ucolor& c)
+static fcolor to_float(const ucolor& c)
 {
-	f32 r = c.r / 255.0f;
-	f32 g = c.g / 255.0f;
-	f32 b = c.b / 255.0f;
-	f32 a = c.a / 255.0f;
-	return fcolor(r, g, b, a);
+	return fcolor(c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, c.a / 255.0f);
 }
 
-ucolor to_uint(const fcolor& c)
+static ucolor to_uint(const fcolor& c)
 {
 	u8 r = static_cast<u8>(std::clamp(c.r, 0.0f, 1.0f) * 255.0f);
 	u8 g = static_cast<u8>(std::clamp(c.g, 0.0f, 1.0f) * 255.0f);
@@ -34,8 +34,6 @@ ucolor to_uint(const fcolor& c)
 	return ucolor(r, g, b, a);
 }
 
-// https://www.color-hex.com/color-palette/3497
-
 static const std::vector<ucolor> colors = {
 	//{ 255, 0, 0, 255 },   // Red
 	//{ 0, 255, 0, 255 },   // Green
@@ -43,8 +41,6 @@ static const std::vector<ucolor> colors = {
 	//{ 255, 255, 0, 255 }, // Yellow
 	//{ 255, 0, 255, 255 }, // Magenta
 	//{ 0, 255, 255, 255 }  // Cyan
-	
+
 	{ 0, 102, 178, 128 }, // water
 };
-
-

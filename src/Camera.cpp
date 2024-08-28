@@ -6,7 +6,17 @@
 // Project the point in [-1, 1] screen space onto the arcball sphere
 static qf32 screen_to_arcball(const vf2& p);
 
-ArcballCamera::ArcballCamera(const vf3& eye, const vf3& center, const vf3& up)
+ArcballCamera::ArcballCamera(const vf3& eye, const vf3& center, const vf3& up, f32 fov, f32 aspect, f32 near, f32 far)
+{
+    field_of_view = fov;
+    aspect_ratio  = aspect;
+    near_plane    = near;
+    far_plane     = far;
+
+    init(eye, center, up);
+}
+
+void ArcballCamera::init(const vf3& eye, const vf3& center, const vf3& up)
 {
     const vf3 dir = center - eye;
     vf3 z = glm::normalize(dir);
@@ -15,8 +25,8 @@ ArcballCamera::ArcballCamera(const vf3& eye, const vf3& center, const vf3& up)
     x = glm::normalize(glm::cross(z, y));
 
     center_translation = glm::inverse(glm::translate(center));
-    translation        = glm::translate(vf3(0.0f, 0.0f, -glm::length(dir)));
-    rotation           = glm::normalize(glm::quat_cast(glm::transpose(mf3x3(x, y, -z))));
+    translation = glm::translate(vf3(0.0f, 0.0f, -glm::length(dir)));
+    rotation = glm::normalize(glm::quat_cast(glm::transpose(mf3x3(x, y, -z))));
 
     update_camera();
 }
@@ -55,6 +65,13 @@ void ArcballCamera::zoom(const f32 zoom_amount)
     update_camera();
 }
 
+void ArcballCamera::translate(vf3 position)
+{
+    translation = glm::translate(position);
+
+    update_camera();
+}
+
 const mf4x4& ArcballCamera::transform() const
 {
     return camera;
@@ -80,10 +97,33 @@ vf3 ArcballCamera::up() const
     return glm::normalize(vf3{ inv_camera * vf4{0, 1, 0, 0} });
 }
 
+const mf4x4& ArcballCamera::projection() const
+{
+    return proj;
+}
+
+const mf4x4& ArcballCamera::inv_projection() const
+{
+    return inv_proj;
+}
+
+const mf4x4 ArcballCamera::proj_camera() const
+{
+    return proj * camera;
+}
+
 void ArcballCamera::update_camera()
 {
-    camera = translation * mat4_cast(rotation) * center_translation;
-    inv_camera = glm::inverse(camera);
+    camera      = translation * mat4_cast(rotation) * center_translation;
+    inv_camera  = glm::inverse(camera);
+
+    update_projection(field_of_view, aspect_ratio, near_plane, far_plane);
+}
+
+void ArcballCamera::update_projection(f32 fov, f32 aspect, f32 near, f32 far)
+{
+    proj        = glm::perspective(glm::radians(fov), aspect, near, far);
+    inv_proj    = glm::inverse(proj);
 }
 
 glm::quat screen_to_arcball(const vf2& p)

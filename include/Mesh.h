@@ -15,7 +15,6 @@ struct vertex
 	vf4 color;
 };
 
-
 struct mesh
 {
 	u32 vao, vbo, ibo;
@@ -26,7 +25,7 @@ struct mesh
 
 	mesh(std::string filepath) 
 	{ 
-		load(filepath);
+		load_from_file(filepath);
 
 		// Generate vertex buffers
 		glGenVertexArrays(1, &vao);
@@ -101,7 +100,7 @@ struct mesh
 		glBindVertexArray(0);
 	}
 
-	void load(std::string filepath)
+	void load_from_file(std::string filepath)
 	{
 		std::ifstream file(filepath);
 		if (!file.is_open())
@@ -115,22 +114,19 @@ struct mesh
 		std::vector<vi2> vertex_texture_indices;
 		std::vector<vi3> vertex_normal_indices;
 
-		std::string data;
-		while (std::getline(file, data))
+		std::string prefix;
+		while (file >> prefix)
 		{
-			std::istringstream iss(data);
-			std::string prefix;
-			iss >> prefix;
 			if (prefix == "v") // Point
 			{
 				vf3 p;
-				iss >> p.x >> p.y >> p.z;
+				file >> p.x >> p.y >> p.z;
 				vertex_points.push_back(p);
 			}
 			if (prefix == "vn") // Normal
 			{
 				vf3 n;
-				iss >> n.x >> n.y >> n.z;
+				file >> n.x >> n.y >> n.z;
 				vertex_normals.push_back(n);
 			}
 			if (prefix == "f") // Face
@@ -139,7 +135,7 @@ struct mesh
 				u8 slash;
 				vi3 v_idx, v_tex_idx, v_norm_idx;
 				for (s32 i = 0; i < 3; i++)
-					iss >> v_idx[i] >> slash >> v_tex_idx[i] >> slash >> v_norm_idx[i];
+					file >> v_idx[i] >> slash >> v_tex_idx[i] >> slash >> v_norm_idx[i];
 
 				// Obj idx starts from 1, so subtract 1
 				vertex_indices.push_back(v_idx - 1);
@@ -158,7 +154,7 @@ struct mesh
 				v.position = vertex_points[vertex_indices[i][j]];
 				v.normal   = vertex_normals[vertex_normal_indices[i][j]];
 
-				fcolor c = to_float(colors[j % colors.size()]);
+				const fcolor& c = to_float(colors[0]);
 				v.color = { c.r, c.g, c.b, c.a };
 
 				vertices.push_back(v);

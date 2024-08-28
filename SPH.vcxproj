@@ -22,10 +22,12 @@
     <ClInclude Include="include\Camera.h" />
     <ClInclude Include="include\Color.h" />
     <ClInclude Include="include\Common.h" />
+    <ClInclude Include="include\GUI.h" />
     <ClInclude Include="include\Input.h" />
     <ClInclude Include="include\Mesh.h" />
     <ClInclude Include="include\Random.h" />
     <ClInclude Include="include\Shader.h" />
+    <ClInclude Include="include\Simulator.h" />
     <ClInclude Include="include\SPH.h" />
     <ClInclude Include="include\Window.h" />
     <ClInclude Include="lib\glad\include\glad\glad.h" />
@@ -318,14 +320,35 @@
     <ClInclude Include="lib\glm\vec3.hpp" />
     <ClInclude Include="lib\glm\vec4.hpp" />
     <ClInclude Include="lib\glm\vector_relational.hpp" />
+    <ClInclude Include="lib\imgui\backends\imgui_impl_glfw.h" />
+    <ClInclude Include="lib\imgui\backends\imgui_impl_opengl3.h" />
+    <ClInclude Include="lib\imgui\backends\imgui_impl_opengl3_loader.h" />
+    <ClInclude Include="lib\imgui\imconfig.h" />
+    <ClInclude Include="lib\imgui\imgui.h" />
+    <ClInclude Include="lib\imgui\imgui_internal.h" />
+    <ClInclude Include="lib\imgui\imstb_rectpack.h" />
+    <ClInclude Include="lib\imgui\imstb_textedit.h" />
+    <ClInclude Include="lib\imgui\imstb_truetype.h" />
+    <ClInclude Include="lib\imgui\misc\cpp\imgui_stdlib.h" />
     <ClInclude Include="test\Test.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="lib\glad\src\glad.c" />
     <ClCompile Include="lib\glm\detail\glm.cpp" />
+    <ClCompile Include="lib\imgui\backends\imgui_impl_glfw.cpp" />
+    <ClCompile Include="lib\imgui\backends\imgui_impl_opengl3.cpp" />
+    <ClCompile Include="lib\imgui\imgui.cpp" />
+    <ClCompile Include="lib\imgui\imgui_demo.cpp" />
+    <ClCompile Include="lib\imgui\imgui_draw.cpp" />
+    <ClCompile Include="lib\imgui\imgui_tables.cpp" />
+    <ClCompile Include="lib\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="lib\imgui\misc\cpp\imgui_stdlib.cpp" />
     <ClCompile Include="src\Camera.cpp" />
+    <ClCompile Include="src\imgui_test.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Shader.cpp" />
+    <ClCompile Include="src\Simulator.cpp" />
+    <ClCompile Include="src\Window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="lib\glm\detail\func_common.inl" />
@@ -479,26 +502,26 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>ClangCL</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>ClangCL</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>ClangCL</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>ClangCL</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -521,26 +544,26 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>D:\git\projects\SPH\SPH\lib\glad\include;D:\git\projects\SPH\SPH\lib\glfw\include;D:\git\projects\SPH\SPH\lib;D:\git\projects\SPH\SPH\include;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\git\projects\SPH\SPH\lib\glfw\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>D:\git\projects\SPH\SPH\lib\glad\include;D:\git\projects\SPH\SPH\lib\glfw\include;D:\git\projects\SPH\SPH\lib;D:\git\projects\SPH\SPH\include;D:\git\projects\SPH\SPH\lib\imgui;D:\git\projects\SPH\SPH\lib\imgui\backends;D:\git\projects\SPH\SPH\lib\imgui\misc</IncludePath>
+    <LibraryPath>D:\git\projects\SPH\SPH\lib\glfw\lib;C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\Llvm\lib;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)build\bin</OutDir>
     <IntDir>$(SolutionDir)build\obj</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>D:\git\projects\SPH\SPH\lib\glad\include;D:\git\projects\SPH\SPH\lib\glfw\include;D:\git\projects\SPH\SPH\lib;D:\git\projects\SPH\SPH\include;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\git\projects\SPH\SPH\lib\glfw\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>D:\git\projects\SPH\SPH\lib\glad\include;D:\git\projects\SPH\SPH\lib\glfw\include;D:\git\projects\SPH\SPH\lib;D:\git\projects\SPH\SPH\include;D:\git\projects\SPH\SPH\lib\imgui;D:\git\projects\SPH\SPH\lib\imgui\backends;D:\git\projects\SPH\SPH\lib\imgui\misc</IncludePath>
+    <LibraryPath>D:\git\projects\SPH\SPH\lib\glfw\lib;C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\Llvm\lib;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)build\bin</OutDir>
     <IntDir>$(SolutionDir)build\obj</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>D:\git\projects\SPH\SPH\lib\glad\include;D:\git\projects\SPH\SPH\lib\glfw\include;D:\git\projects\SPH\SPH\lib;D:\git\projects\SPH\SPH\include;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\git\projects\SPH\SPH\lib\glfw\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>D:\git\projects\SPH\SPH\lib\glad\include;D:\git\projects\SPH\SPH\lib\glfw\include;D:\git\projects\SPH\SPH\lib;D:\git\projects\SPH\SPH\include;D:\git\projects\SPH\SPH\lib\imgui;D:\git\projects\SPH\SPH\lib\imgui\backends;D:\git\projects\SPH\SPH\lib\imgui\misc</IncludePath>
+    <LibraryPath>D:\git\projects\SPH\SPH\lib\glfw\lib;C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\Llvm\lib;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)build\bin</OutDir>
     <IntDir>$(SolutionDir)build\obj</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>D:\git\projects\SPH\SPH\lib\glad\include;D:\git\projects\SPH\SPH\lib\glfw\include;D:\git\projects\SPH\SPH\lib;D:\git\projects\SPH\SPH\include;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\git\projects\SPH\SPH\lib\glfw\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>D:\git\projects\SPH\SPH\lib\glad\include;D:\git\projects\SPH\SPH\lib\glfw\include;D:\git\projects\SPH\SPH\lib;D:\git\projects\SPH\SPH\include;D:\git\projects\SPH\SPH\lib\imgui;D:\git\projects\SPH\SPH\lib\imgui\backends;D:\git\projects\SPH\SPH\lib\imgui\misc</IncludePath>
+    <LibraryPath>D:\git\projects\SPH\SPH\lib\glfw\lib;C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\Llvm\lib;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)build\bin</OutDir>
     <IntDir>$(SolutionDir)build\obj</IntDir>
   </PropertyGroup>
@@ -553,12 +576,19 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <OpenMPSupport>true</OpenMPSupport>
+      <AdditionalOptions>-Xpreprocessor -openmp -lomp %(AdditionalOptions)</AdditionalOptions>
+      <BuildStlModules>true</BuildStlModules>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>Full</Optimization>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>glfw3.lib;opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>glfw3.lib;opengl32.lib;libomp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>-Xpreprocessor -openmp -lomp %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -569,14 +599,20 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <OpenMPSupport>true</OpenMPSupport>
+      <AdditionalOptions>-Xpreprocessor -openmp -lomp %(AdditionalOptions)</AdditionalOptions>
+      <BuildStlModules>true</BuildStlModules>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>Full</Optimization>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>glfw3.lib;opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>glfw3.lib;opengl32.lib;libomp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>-Xpreprocessor -openmp -lomp %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -585,12 +621,19 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <OpenMPSupport>true</OpenMPSupport>
+      <AdditionalOptions>-Xpreprocessor -openmp -lomp %(AdditionalOptions)</AdditionalOptions>
+      <BuildStlModules>true</BuildStlModules>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>Full</Optimization>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>glfw3.lib;opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>glfw3.lib;opengl32.lib;libomp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>-Xpreprocessor -openmp -lomp %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -601,14 +644,20 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <OpenMPSupport>true</OpenMPSupport>
+      <AdditionalOptions>-openmp %(AdditionalOptions)</AdditionalOptions>
+      <BuildStlModules>true</BuildStlModules>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>Full</Optimization>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>glfw3.lib;opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>glfw3.lib;opengl32.lib;libomp.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
