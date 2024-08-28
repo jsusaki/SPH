@@ -194,13 +194,13 @@ private: // Hash map
 
 public:
     SPH() = default;
-    SPH(const settings& si)
+    SPH(const settings si)
     { 
         Init(si);
     }
 
 public:
-    void Init(const settings& si)
+    void Init(const settings si)
     {
         s = si;
         // Initialize Fluid Particles
@@ -320,10 +320,10 @@ public:
                     {
                         u32 cell_hash = hash(cell_origin + vi3(x, y, z));
                         const auto& neighbors = particle_table[cell_hash];
-                        #pragma omp simd
-                        for (u32 j : neighbors)
+                        //#pragma omp simd
+                        for (s32 j = 0; j < neighbors.size(); j++)
                         {
-                            const particle& pj = fluid_particles[j];
+                            const particle& pj = fluid_particles[neighbors[j]];
 
                             if (&pi == &pj || cell_hash != pj.hash) 
                                 continue;
@@ -362,10 +362,10 @@ public:
                     {
                         u32 cell_hash = hash(cell_origin + vi3(x, y, z));
                         const auto& neighbors = particle_table[cell_hash];
-                        #pragma omp simd                        
-                        for (u32 j : neighbors)
+                        //#pragma omp simd
+                        for (s32 j = 0; j < neighbors.size(); j++)
                         {
-                            const particle& pj = fluid_particles[j];
+                            const particle& pj = fluid_particles[neighbors[j]];
 
                             if (&pi == &pj || pj.hash != cell_hash) 
                                 continue;
@@ -415,10 +415,10 @@ public:
                     {
                         u32 cell_hash = hash(cell_origin + vi3(x, y, z));
                         const auto& neighbors = particle_table[cell_hash];
-                        #pragma omp simd                        
-                        for (u32 j : neighbors)
+                        //#pragma omp simd
+                        for (s32 j = 0; j < neighbors.size(); j++)
                         {
-                            const particle& pj = fluid_particles[j];
+                            const particle& pj = fluid_particles[neighbors[j]];
 
                             if (&pi == &pj || pj.hash != cell_hash) 
                                 continue;

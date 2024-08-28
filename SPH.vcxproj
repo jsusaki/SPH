@@ -344,7 +344,6 @@
     <ClCompile Include="lib\imgui\imgui_widgets.cpp" />
     <ClCompile Include="lib\imgui\misc\cpp\imgui_stdlib.cpp" />
     <ClCompile Include="src\Camera.cpp" />
-    <ClCompile Include="src\imgui_test.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Shader.cpp" />
     <ClCompile Include="src\Simulator.cpp" />
@@ -544,28 +543,28 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>D:\git\projects\SPH\SPH\lib\glad\include;D:\git\projects\SPH\SPH\lib\glfw\include;D:\git\projects\SPH\SPH\lib;D:\git\projects\SPH\SPH\include;D:\git\projects\SPH\SPH\lib\imgui;D:\git\projects\SPH\SPH\lib\imgui\backends;D:\git\projects\SPH\SPH\lib\imgui\misc</IncludePath>
+    <IncludePath>D:\git\projects\SPH\SPH\lib\glad\include;D:\git\projects\SPH\SPH\lib\glfw\include;D:\git\projects\SPH\SPH\lib;D:\git\projects\SPH\SPH\include;D:\git\projects\SPH\SPH\lib\imgui;D:\git\projects\SPH\SPH\lib\imgui\backends;D:\git\projects\SPH\SPH\lib\imgui\misc;$(IncludePath)</IncludePath>
     <LibraryPath>D:\git\projects\SPH\SPH\lib\glfw\lib;C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\Llvm\lib;$(LibraryPath)</LibraryPath>
-    <OutDir>$(SolutionDir)build\bin</OutDir>
-    <IntDir>$(SolutionDir)build\obj</IntDir>
+    <OutDir>$(SolutionDir)build\bin\</OutDir>
+    <IntDir>$(SolutionDir)build\obj\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>D:\git\projects\SPH\SPH\lib\glad\include;D:\git\projects\SPH\SPH\lib\glfw\include;D:\git\projects\SPH\SPH\lib;D:\git\projects\SPH\SPH\include;D:\git\projects\SPH\SPH\lib\imgui;D:\git\projects\SPH\SPH\lib\imgui\backends;D:\git\projects\SPH\SPH\lib\imgui\misc</IncludePath>
+    <IncludePath>D:\git\projects\SPH\SPH\lib\glad\include;D:\git\projects\SPH\SPH\lib\glfw\include;D:\git\projects\SPH\SPH\lib;D:\git\projects\SPH\SPH\include;D:\git\projects\SPH\SPH\lib\imgui;D:\git\projects\SPH\SPH\lib\imgui\backends;D:\git\projects\SPH\SPH\lib\imgui\misc;$(IncludePath)</IncludePath>
     <LibraryPath>D:\git\projects\SPH\SPH\lib\glfw\lib;C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\Llvm\lib;$(LibraryPath)</LibraryPath>
-    <OutDir>$(SolutionDir)build\bin</OutDir>
-    <IntDir>$(SolutionDir)build\obj</IntDir>
+    <OutDir>$(SolutionDir)build\bin\</OutDir>
+    <IntDir>$(SolutionDir)build\obj\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>D:\git\projects\SPH\SPH\lib\glad\include;D:\git\projects\SPH\SPH\lib\glfw\include;D:\git\projects\SPH\SPH\lib;D:\git\projects\SPH\SPH\include;D:\git\projects\SPH\SPH\lib\imgui;D:\git\projects\SPH\SPH\lib\imgui\backends;D:\git\projects\SPH\SPH\lib\imgui\misc</IncludePath>
+    <IncludePath>D:\git\projects\SPH\SPH\lib\glad\include;D:\git\projects\SPH\SPH\lib\glfw\include;D:\git\projects\SPH\SPH\lib;D:\git\projects\SPH\SPH\include;D:\git\projects\SPH\SPH\lib\imgui;D:\git\projects\SPH\SPH\lib\imgui\backends;D:\git\projects\SPH\SPH\lib\imgui\misc;$(IncludePath)</IncludePath>
     <LibraryPath>D:\git\projects\SPH\SPH\lib\glfw\lib;C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\Llvm\lib;$(LibraryPath)</LibraryPath>
-    <OutDir>$(SolutionDir)build\bin</OutDir>
-    <IntDir>$(SolutionDir)build\obj</IntDir>
+    <OutDir>$(SolutionDir)build\bin\</OutDir>
+    <IntDir>$(SolutionDir)build\obj\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>D:\git\projects\SPH\SPH\lib\glad\include;D:\git\projects\SPH\SPH\lib\glfw\include;D:\git\projects\SPH\SPH\lib;D:\git\projects\SPH\SPH\include;D:\git\projects\SPH\SPH\lib\imgui;D:\git\projects\SPH\SPH\lib\imgui\backends;D:\git\projects\SPH\SPH\lib\imgui\misc</IncludePath>
+    <IncludePath>D:\git\projects\SPH\SPH\lib\glad\include;D:\git\projects\SPH\SPH\lib\glfw\include;D:\git\projects\SPH\SPH\lib;D:\git\projects\SPH\SPH\include;D:\git\projects\SPH\SPH\lib\imgui;D:\git\projects\SPH\SPH\lib\imgui\backends;D:\git\projects\SPH\SPH\lib\imgui\misc;$(IncludePath)</IncludePath>
     <LibraryPath>D:\git\projects\SPH\SPH\lib\glfw\lib;C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\Llvm\lib;$(LibraryPath)</LibraryPath>
-    <OutDir>$(SolutionDir)build\bin</OutDir>
-    <IntDir>$(SolutionDir)build\obj</IntDir>
+    <OutDir>$(SolutionDir)build\bin\</OutDir>
+    <IntDir>$(SolutionDir)build\obj\</IntDir>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg">
     <VcpkgEnabled>false</VcpkgEnabled>
@@ -578,17 +577,18 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <OpenMPSupport>true</OpenMPSupport>
-      <AdditionalOptions>-Xpreprocessor -openmp -lomp %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>-openmp -mavx2 -march=native %(AdditionalOptions)</AdditionalOptions>
       <BuildStlModules>true</BuildStlModules>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <Optimization>Full</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>glfw3.lib;opengl32.lib;libomp.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalOptions>-Xpreprocessor -openmp -lomp %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>-openmp %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -601,10 +601,11 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <OpenMPSupport>true</OpenMPSupport>
-      <AdditionalOptions>-Xpreprocessor -openmp -lomp %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>-openmp -mavx2 -march=native %(AdditionalOptions)</AdditionalOptions>
       <BuildStlModules>true</BuildStlModules>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <Optimization>Full</Optimization>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -612,7 +613,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>glfw3.lib;opengl32.lib;libomp.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalOptions>-Xpreprocessor -openmp -lomp %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>-openmp %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -623,17 +624,18 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <OpenMPSupport>true</OpenMPSupport>
-      <AdditionalOptions>-Xpreprocessor -openmp -lomp %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>-openmp -mavx2 -march=native %(AdditionalOptions)</AdditionalOptions>
       <BuildStlModules>true</BuildStlModules>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <Optimization>Full</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>glfw3.lib;opengl32.lib;libomp.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalOptions>-Xpreprocessor -openmp -lomp %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>-openmp %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -646,7 +648,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <OpenMPSupport>true</OpenMPSupport>
-      <AdditionalOptions>-openmp %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>-openmp -mavx2 -march=native %(AdditionalOptions)</AdditionalOptions>
       <BuildStlModules>true</BuildStlModules>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <Optimization>Full</Optimization>
@@ -658,6 +660,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>glfw3.lib;opengl32.lib;libomp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>-openmp %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

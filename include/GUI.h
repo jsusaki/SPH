@@ -18,8 +18,8 @@ public:
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
         io = ImGui::GetIO(); (void)io;
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
         // Setup Dear ImGui style
         ImGui::StyleColorsDark();
         // Setup Platform/Renderer backends
@@ -33,8 +33,6 @@ public:
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-
-        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
         {
             s32 n_particles = 25000;
             f32 rest_density = 997.0f;
@@ -62,7 +60,8 @@ public:
             ImGui::SliderFloat("Boundary Dampening", &boundary_damping, 1.0f, 100.0f);
             ImGui::SliderFloat3("Boudary Size", glm::value_ptr(boundary_size), 0.1f, 1.0f);
 
-            if (ImGui::Button("Reset")) {
+            if (ImGui::Button("Reset")) 
+            {
 
             }
 

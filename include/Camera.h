@@ -1,4 +1,4 @@
-// arcball-cpp: https://github.com/Twinklebear/arcball-cpp
+// based on arcball-cpp: https://github.com/Twinklebear/arcball-cpp
 #include "Common.h"
 
 class ArcballCamera
