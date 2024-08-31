@@ -36,6 +36,8 @@ private: // Main functions
 
 private: // Helper functions
     void UpdateFrameTime();
+    void ResetSimulation(const SPHSettings& settings);
+    void RestartSimulation();
 
 private: // Simulator variables
     // Timing
@@ -59,7 +61,7 @@ private: // Simulator variables
 
 private: // Simulation variables
     // Camera
-    std::shared_ptr<ArcballCamera> camera;
+    ArcballCamera camera;
     vf2 transform_mouse(vf2 p) { return vf2(p.x * 2.0f / SCREEN_WIDTH - 1.0f, 1.0f - 2.0f * p.y / SCREEN_HEIGHT); }
 
     // Graphics
@@ -69,12 +71,22 @@ private: // Simulation variables
 
     // Smoothed Particle Hydrodynamics
     SPH sph;
-    settings sph_settings;
-    bool simulate = false;
-    bool reset = false;
-    bool step = false;
+    SPHSettings default_settings;
+    SPHSettings current_settings;
+
+    // SPH Simulation State
+    enum class State : u8
+    {
+        PAUSE,     // Pause the simulation
+        SIMULATE,  // Run the simulation
+        STEP,      // Step the simulation
+        RESET,     // Reset the simulation default state
+        APPLY,     // Apply new settings
+        RESTART,   // Restart the current simulation
+    };
+    State current_state = State::PAUSE;
+    State next_state    = State::PAUSE;
 
     // GUI
     GUI gui;
-
 };

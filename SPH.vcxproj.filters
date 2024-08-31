@@ -951,6 +951,12 @@
     <ClInclude Include="lib\imgui\backends\imgui_impl_opengl3_loader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\Config.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Particle.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="lib\glad\src\glad.c">
@@ -998,7 +1004,7 @@
     <ClCompile Include="lib\imgui\backends\imgui_impl_glfw.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\imgui_test.cpp">
+    <ClCompile Include="src\SPH.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

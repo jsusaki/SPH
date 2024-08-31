@@ -2,6 +2,7 @@
 
 #include <array>
 #include "Common.h"
+#include <glfw3.h>
 
 class Input
 {
@@ -32,7 +33,7 @@ public: // TODO: instead of singleton make it static functions
 private:
     Input() = default;
 
-    static const s32 MAX_KEYS = 257;
+    static const s32 MAX_KEYS = GLFW_KEY_LAST;
     static const s32 MAX_BUTTONS = 5;
     
     std::array<bool, MAX_KEYS>    keys = {};
