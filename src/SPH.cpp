@@ -63,6 +63,7 @@ void SPH::Simulate(f32 dt)
         Particle& p = fluid_particles[i];
         p.hash = hash(cell(p, settings.smoothing_radius));
     }
+
     // Sort Particles
     std::sort(fluid_particles.begin(), fluid_particles.end(), [&](const Particle& i, const Particle& j) { return i.hash < j.hash; });
 
@@ -73,9 +74,9 @@ void SPH::Simulate(f32 dt)
 
     //ComputeDensityPressure();
     ComputeDensityPressureIntrinsics();
-
-    ComputePressureViscousSurfaceTensionForce();
-    //ComputePressureViscousSurfaceTensionForceIntrinsics();
+    
+    //ComputePressureViscousSurfaceTensionForce();
+    ComputePressureViscousSurfaceTensionForceIntrinsics();
 
     Integrate(dt);
 
@@ -123,24 +124,22 @@ void SPH::ComputeDensityPressure()
 
 void SPH::ComputeDensityPressureIntrinsics()
 {
-    f32 pjx_array[8] = { 0.0f }, pjy_array[8] = { 0.0f }, pjz_array[8] = { 0.0f };
+    f32 pj_px[8] = { 0.0f }, pj_py[8] = { 0.0f }, pj_pz[8] = { 0.0f };
 
     // 64-bit float registers
     // Positions
-    __m256 _pjx, _pjy, _pjz;
-    __m256 _pix, _piy, _piz;
+    __m256 _mass, _density;
+    __m256 _pi_px, _pi_py, _pi_pz;
+    __m256 _pj_px, _pj_py, _pj_pz;
 
     // Squared distance
     __m256 _dx, _dy, _dz, _dx2, _dy2, _dz2, _dx2dy2;
     __m256 _dist2;
     // if condition with bitwise AND operation
     __m256 _mask;
-    // Density with poly6
-    __m256 _poly6, _smoothing_radius2, _mass;
+    // Kernels
+    __m256 _poly6, _smoothing_radius2;
     __m256 _radius_diff, _radius_diff2, _radius_diff3, _poly6_radius_diff;
-    __m256 _density;
-    __m128 _lo, _hi;
-    __m128 _sum;
 
     // Set constants into AVX2 registers
     _poly6 = _mm256_set1_ps(settings.poly6);
@@ -154,9 +153,9 @@ void SPH::ComputeDensityPressureIntrinsics()
         pi.pressure = 0.0f;
 
         // Set own positions
-        _pix = _mm256_set1_ps(pi.position.x);
-        _piy = _mm256_set1_ps(pi.position.y);
-        _piz = _mm256_set1_ps(pi.position.z);
+        _pi_px = _mm256_set1_ps(pi.position.x);
+        _pi_py = _mm256_set1_ps(pi.position.y);
+        _pi_pz = _mm256_set1_ps(pi.position.z);
 
         vi3 cell_origin = cell(pi, settings.smoothing_radius);
         for (s32 x = -1; x <= 1; x++)
@@ -167,27 +166,33 @@ void SPH::ComputeDensityPressureIntrinsics()
                 {
                     u32 cell_hash = hash(cell_origin + vi3(x, y, z));
                     const auto& neighbors = particle_table[cell_hash];
-
-                    for (s32 j = 0; j < neighbors.size(); j += 8) // Process 8 neighbors at a time
+                    for (s32 j = 0; j < neighbors.size(); j += 8)
                     {
-                        // Transform into a contiguous array for SIMD
-                        for (s32 k = 0; k < 8; k++) {
-                            if (j + k < neighbors.size()) {
-                                pjx_array[k] = fluid_particles[neighbors[j + k]].position.x;
-                                pjy_array[k] = fluid_particles[neighbors[j + k]].position.y;
-                                pjz_array[k] = fluid_particles[neighbors[j + k]].position.z;
+                        // Clear the arrays
+                        std::fill(std::begin(pj_px), std::end(pj_px), 0.0f);
+                        std::fill(std::begin(pj_py), std::end(pj_py), 0.0f);
+                        std::fill(std::begin(pj_pz), std::end(pj_pz), 0.0f);
+
+                        for (s32 k = 0; k < 8; k++)
+                        {
+                            if (j + k < neighbors.size())
+                            {
+                                const Particle& pj = fluid_particles[neighbors[j + k]];
+                                pj_px[k] = pj.position.x;
+                                pj_py[k] = pj.position.y;
+                                pj_pz[k] = pj.position.z;
                             }
                         }
 
                         // Load neighbor positions
-                        _pjx = _mm256_load_ps(pjx_array);
-                        _pjy = _mm256_load_ps(pjy_array);
-                        _pjz = _mm256_load_ps(pjz_array);
+                        _pj_px = _mm256_loadu_ps(pj_px);
+                        _pj_py = _mm256_loadu_ps(pj_py);
+                        _pj_pz = _mm256_loadu_ps(pj_pz);
 
                         // Compute squared distance
-                        _dx     = _mm256_sub_ps(_pix, _pjx);
-                        _dy     = _mm256_sub_ps(_piy, _pjy);
-                        _dz     = _mm256_sub_ps(_piz, _pjz);
+                        _dx     = _mm256_sub_ps(_pi_px, _pj_px);
+                        _dy     = _mm256_sub_ps(_pi_py, _pj_py);
+                        _dz     = _mm256_sub_ps(_pi_pz, _pj_pz);
                         _dx2    = _mm256_mul_ps(_dx, _dx);
                         _dy2    = _mm256_mul_ps(_dy, _dy);
                         _dz2    = _mm256_mul_ps(_dz, _dz);
@@ -199,23 +204,26 @@ void SPH::ComputeDensityPressureIntrinsics()
 
                         // Compute density for particles within the smoothing radius
                         //pi.density += pj.mass * settings.poly6 * std::pow(settings.smoothing_radius2 - distance2, 3.0f);
-                        _radius_diff       = _mm256_sub_ps(_smoothing_radius2, _dist2);
-                        _radius_diff2      = _mm256_mul_ps(_radius_diff, _radius_diff);
-                        _radius_diff3      = _mm256_mul_ps(_radius_diff2, _radius_diff);
+                        _radius_diff = _mm256_sub_ps(_smoothing_radius2, _dist2);
+                        _radius_diff2 = _mm256_mul_ps(_radius_diff, _radius_diff);
+                        _radius_diff3 = _mm256_mul_ps(_radius_diff2, _radius_diff);
                         _poly6_radius_diff = _mm256_mul_ps(_poly6, _radius_diff3);
-                        _density           = _mm256_mul_ps(_mass, _poly6_radius_diff);
+                        _density = _mm256_mul_ps(_mass, _poly6_radius_diff);
+
                         // Apply mask to zero out the contribution for particles outside the smoothing radius
                         _density = _mm256_blendv_ps(_mm256_setzero_ps(), _density, _mask);
+
                         // Reduce
-                        // Horizontally add pairs of adjacent elements
-                        _lo = _mm256_castps256_ps128(_density);
-                        _hi = _mm256_extractf128_ps(_density, 1);
-                        _lo = _mm_add_ps(_lo, _hi);
-                        // Horizontally add the resulting vector
-                        _sum = _mm_hadd_ps(_lo, _lo);
-                        _sum = _mm_hadd_ps(_sum, _sum);
-                        // Horizontally add to sum the contributions
-                        pi.density += _mm_cvtss_f32(_sum);
+                        f32 density[8] = { 0.0f };
+                        _mm256_storeu_ps(density, _density);
+
+                        f32 density_sum = 0.0f;
+                        for (s32 j = 0; j < 8; j++)
+                        {
+                            if (!std::isnan(density[j]))
+                                density_sum += density[j];
+                        }
+                        pi.density += density_sum;
                     }
                 }
             }
@@ -238,7 +246,6 @@ void SPH::ComputePressureViscousSurfaceTensionForce()
         vf3 gravity_force = pi.mass * settings.gravity;
 
         vi3 cell_origin = cell(pi, settings.smoothing_radius);
-
         for (s32 x = -1; x <= 1; x++)
         {
             for (s32 y = -1; y <= 1; y++)
@@ -247,7 +254,6 @@ void SPH::ComputePressureViscousSurfaceTensionForce()
                 {
                     u32 cell_hash = hash(cell_origin + vi3(x, y, z));
                     const auto& neighbors = particle_table[cell_hash];
-                    // TODO: Intrinsics
                     for (s32 j = 0; j < neighbors.size(); j++)
                     {
                         Particle& pj = fluid_particles[neighbors[j]];
@@ -262,8 +268,8 @@ void SPH::ComputePressureViscousSurfaceTensionForce()
                             f32 distance = std::sqrt(distance2);
                             vf3 direction = glm::normalize(difference);
 
-                            pressure_force += -direction * pj.mass * (pi.pressure + pj.pressure) / (2.0f * pj.density) * settings.spiky_grad * std::pow(settings.smoothing_radius - distance, 3.0f);
-                            viscous_force += pj.mass * settings.viscosity * (pj.velocity - pi.velocity) / pj.density * settings.spiky_laplacian * (settings.smoothing_radius - distance);
+                            pressure_force += -direction * pj.mass * ((pi.pressure + pj.pressure) / (2.0f * pj.density)) * settings.spiky_grad * std::pow(settings.smoothing_radius - distance, 3.0f);
+                            viscous_force += pj.mass * settings.viscosity * ((pj.velocity - pi.velocity) / pj.density) * settings.spiky_laplacian * (settings.smoothing_radius - distance);
                             normal += direction * pj.mass / pj.density * settings.spiky_grad * std::pow(settings.smoothing_radius - distance, 3.0f);
                         }
                     }
@@ -282,47 +288,126 @@ void SPH::ComputePressureViscousSurfaceTensionForce()
 
 void SPH::ComputePressureViscousSurfaceTensionForceIntrinsics()
 {
-    __m256 _gravity_x = _mm256_set1_ps(settings.gravity.x);
-    __m256 _gravity_y = _mm256_set1_ps(settings.gravity.y);
-    __m256 _gravity_z = _mm256_set1_ps(settings.gravity.z);
+    f32 pj_px[8] = { 0.0f }, pj_py[8] = { 0.0f }, pj_pz[8] = { 0.0f };
+    f32 pj_vx[8] = { 0.0f }, pj_vy[8] = { 0.0f }, pj_vz[8] = { 0.0f };
+    f32 pj_density[8] = { 0.0f }, pj_pressure[8] = { 0.0f };
 
-    __m256 _smoothing_radius = _mm256_set1_ps(settings.smoothing_radius);
-    __m256 _smoothing_radius2 = _mm256_set1_ps(settings.smoothing_radius2);
-    __m256 _spiky_grad = _mm256_set1_ps(settings.spiky_grad);
-    __m256 _spiky_laplacian = _mm256_set1_ps(settings.spiky_laplacian);
-    __m256 _viscosity = _mm256_set1_ps(settings.viscosity);
-    __m256 _two = _mm256_set1_ps(2.0f);
+    __m256 _viscosity, _mass;
+    __m256 _gravity_x, _gravity_y, _gravity_z;
+
+    // pi data
+    __m256 _pi_px, _pi_py, _pi_pz;
+    __m256 _pi_vx, _pi_vy, _pi_vz;
+    __m256 _pi_pressure, _pi_density;
+
+    // pj data
+    __m256 _pj_px, _pj_py, _pj_pz;
+    __m256 _pj_vx, _pj_vy, _pj_vz;
+    __m256 _pj_density, _pj_pressure;
+
+    // Squared distance
+    __m256 _dx, _dy, _dz, _dx2, _dy2, _dz2, _dx2dy2;
+    __m256 _dist2, _dist;
+    __m256 _inv_dist, _dir_x, _dir_y, _dir_z;
+
+    // Kernels
+    __m256 _smoothing_radius, _smoothing_radius2, _spiky_grad, _spiky_laplacian;
+    __m256 _radius_diff, _radius_diff2, _radius_diff3;
+
+    // Forces
+    __m256 _acceleration_x, _acceleration_y, _acceleration_z;
+    __m256 _gravity_force_x, _gravity_force_y, _gravity_force_z;
+
+    // Pressure
+    __m256 _pressure_force, _pressure_force_x, _pressure_force_y, _pressure_force_z;
+    __m256 _pressure_density, _two_pj_density, _mass_pressure_density_spiky_grad, _pi_pj_pressure_add, _mass_pressure_density;
+    
+    // Viscosity
+    __m256 _viscous_force, _viscous_force_x, _viscous_force_y, _viscous_force_z;
+    __m256 _pj_mass_visc, _spiky_laplacian_pj_density, _spiky_laplacian_pj_density_radius_diff;
+    __m256 _dvx, _dvy, _dvz, _dvx_density, _dvy_density, _dvz_density;
+
+    // Surface Tension
+    __m256 _curvature, _surface_tension_x, _surface_tension_y, _surface_tension_z;
+    __m256 _normal_x, _normal_y, _normal_z;
+    __m256 _norm_mag, _inv_norm_mag, _norm_x_unit, _norm_y_unit, _norm_z_unit;
+
+    // Constants
+    __m256 _zero, _one, _two, _mask1, _mask2;
+
+    __m256 _min, _max;
+
+    _smoothing_radius  = _mm256_set1_ps(settings.smoothing_radius);
+    _smoothing_radius2 = _mm256_set1_ps(settings.smoothing_radius2);
+    _spiky_grad        = _mm256_set1_ps(settings.spiky_grad);
+    _spiky_laplacian   = _mm256_set1_ps(settings.spiky_laplacian);
+
+    _gravity_x = _mm256_set1_ps(settings.gravity.x);
+    _gravity_y = _mm256_set1_ps(settings.gravity.y);
+    _gravity_z = _mm256_set1_ps(settings.gravity.z);
+    _viscosity = _mm256_set1_ps(settings.viscosity);
+    _mass      = _mm256_set1_ps(settings.mass);
+
+    _zero = _mm256_set1_ps(0.0f);
+    _one  = _mm256_set1_ps(1.0f);
+    _two  = _mm256_set1_ps(2.0f);
+
+    _min = _mm256_set1_ps(std::numeric_limits<f32>::min());
+    _max = _mm256_set1_ps(std::numeric_limits<f32>::max());
+
+    //_min = _mm256_set1_ps(-10.0f);
+    //_max = _mm256_set1_ps(10.0f);
+    auto clamp = [](__m256 a, __m256 min, __m256 max) { return _mm256_max_ps(min, _mm256_min_ps(a, max)); };
 
     for (s32 i = 0; i < fluid_particles.size(); i++)
     {
         Particle& pi = fluid_particles[i];
 
-        __m256 _acc_x = _mm256_setzero_ps();
-        __m256 _acc_y = _mm256_setzero_ps();
-        __m256 _acc_z = _mm256_setzero_ps();
+        // Set own positions
+        _pi_px = _mm256_set1_ps(pi.position.x);
+        _pi_py = _mm256_set1_ps(pi.position.y);
+        _pi_pz = _mm256_set1_ps(pi.position.z);
 
-        __m256 _press_x = _mm256_setzero_ps();
-        __m256 _press_y = _mm256_setzero_ps();
-        __m256 _press_z = _mm256_setzero_ps();
+        _pi_vx = _mm256_set1_ps(pi.velocity.x);
+        _pi_vy = _mm256_set1_ps(pi.velocity.y);
+        _pi_vz = _mm256_set1_ps(pi.velocity.z);
 
-        __m256 _visc_x = _mm256_setzero_ps();
-        __m256 _visc_y = _mm256_setzero_ps();
-        __m256 _visc_z = _mm256_setzero_ps();
+        _pi_density  = _mm256_set1_ps(pi.density);
+        _pi_pressure = _mm256_set1_ps(pi.pressure);
 
-        __m256 _surf_x = _mm256_setzero_ps();
-        __m256 _surf_y = _mm256_setzero_ps();
-        __m256 _surf_z = _mm256_setzero_ps();
+        // Reset acceleration
+        _acceleration_x = _mm256_setzero_ps();
+        _acceleration_y = _mm256_setzero_ps();
+        _acceleration_z = _mm256_setzero_ps();
+        
+        // Reset pressure
+        _pressure_force   = _mm256_setzero_ps();
+        _pressure_force_x = _mm256_setzero_ps();
+        _pressure_force_y = _mm256_setzero_ps();
+        _pressure_force_z = _mm256_setzero_ps();
 
-        __m256 _norm_x = _mm256_setzero_ps();
-        __m256 _norm_y = _mm256_setzero_ps();
-        __m256 _norm_z = _mm256_setzero_ps();
+        // Reset viscous
+        _viscous_force   = _mm256_setzero_ps();
+        _viscous_force_x = _mm256_setzero_ps();
+        _viscous_force_y = _mm256_setzero_ps();
+        _viscous_force_z = _mm256_setzero_ps();
 
-        __m256 _gravity_force_x = _mm256_mul_ps(_mm256_set1_ps(pi.mass), _gravity_x);
-        __m256 _gravity_force_y = _mm256_mul_ps(_mm256_set1_ps(pi.mass), _gravity_y);
-        __m256 _gravity_force_z = _mm256_mul_ps(_mm256_set1_ps(pi.mass), _gravity_z);
+        // Reset surface tension
+        _curvature         = _mm256_setzero_ps();
+        _surface_tension_x = _mm256_setzero_ps();
+        _surface_tension_y = _mm256_setzero_ps();
+        _surface_tension_z = _mm256_setzero_ps();
+
+        _normal_x = _mm256_setzero_ps();
+        _normal_y = _mm256_setzero_ps();
+        _normal_z = _mm256_setzero_ps();
+        
+        // Compute gravity
+        _gravity_force_x = _mm256_mul_ps(_mass, _gravity_x);
+        _gravity_force_y = _mm256_mul_ps(_mass, _gravity_y);
+        _gravity_force_z = _mm256_mul_ps(_mass, _gravity_z);
 
         vi3 cell_origin = cell(pi, settings.smoothing_radius);
-
         for (s32 x = -1; x <= 1; x++)
         {
             for (s32 y = -1; y <= 1; y++)
@@ -331,98 +416,220 @@ void SPH::ComputePressureViscousSurfaceTensionForceIntrinsics()
                 {
                     u32 cell_hash = hash(cell_origin + vi3(x, y, z));
                     const auto& neighbors = particle_table[cell_hash];
-
                     for (s32 j = 0; j < neighbors.size(); j += 8)
                     {
+                        for (s32 k = 0; k < 8; k++)
+                        {
+                            if (j + k < neighbors.size())
+                            {
+                                const Particle& pj = fluid_particles[neighbors[j + k]];
+                                pj_px[k] = pj.position.x;
+                                pj_py[k] = pj.position.y;
+                                pj_pz[k] = pj.position.z;
+
+                                pj_vx[k] = pj.velocity.x;
+                                pj_vy[k] = pj.velocity.y;
+                                pj_vz[k] = pj.velocity.z;
+
+                                //if (pj.velocity.x > 0.0f || pj.velocity.y > 0.0f || pj.velocity.z > 0.0f)
+                                    //std::cout << pj.hash << " " << pj.velocity.x << " " << pj.velocity.y << pj.velocity.z << "\n";
+
+                                pj_density[k]  = pj.density;
+                                pj_pressure[k] = pj.pressure;
+                            }
+                        }
+
                         // Load neighboring particle data
-                        __m256 _px = _mm256_loadu_ps(&fluid_particles[neighbors[j]].position.x);
-                        __m256 _py = _mm256_loadu_ps(&fluid_particles[neighbors[j]].position.y);
-                        __m256 _pz = _mm256_loadu_ps(&fluid_particles[neighbors[j]].position.z);
+                        _pj_px = _mm256_loadu_ps(pj_px);
+                        _pj_py = _mm256_loadu_ps(pj_py);
+                        _pj_pz = _mm256_loadu_ps(pj_pz);
 
-                        __m256 _vx = _mm256_loadu_ps(&fluid_particles[neighbors[j]].velocity.x);
-                        __m256 _vy = _mm256_loadu_ps(&fluid_particles[neighbors[j]].velocity.y);
-                        __m256 _vz = _mm256_loadu_ps(&fluid_particles[neighbors[j]].velocity.z);
+                        _pj_vx = _mm256_loadu_ps(pj_vx);
+                        _pj_vy = _mm256_loadu_ps(pj_vy);
+                        _pj_vz = _mm256_loadu_ps(pj_vz);
 
-                        __m256 _pj_mass = _mm256_loadu_ps(&fluid_particles[neighbors[j]].mass);
-                        __m256 _pj_pressure = _mm256_loadu_ps(&fluid_particles[neighbors[j]].pressure);
-                        __m256 _pj_density = _mm256_loadu_ps(&fluid_particles[neighbors[j]].density);
+                        _pj_density  = _mm256_loadu_ps(pj_density);
+                        _pj_pressure = _mm256_loadu_ps(pj_pressure);
 
-                        // Compute difference
-                        __m256 _dx = _mm256_sub_ps(_px, _mm256_set1_ps(pi.position.x));
-                        __m256 _dy = _mm256_sub_ps(_py, _mm256_set1_ps(pi.position.y));
-                        __m256 _dz = _mm256_sub_ps(_pz, _mm256_set1_ps(pi.position.z));
+                        // Compute squared distance
+                        _dx     = _mm256_sub_ps(_pj_px, _pi_px);
+                        _dy     = _mm256_sub_ps(_pj_py, _pi_py);
+                        _dz     = _mm256_sub_ps(_pj_pz, _pi_pz);
+                        _dx2    = _mm256_mul_ps(_dx, _dx);
+                        _dy2    = _mm256_mul_ps(_dy, _dy);
+                        _dz2    = _mm256_mul_ps(_dz, _dz);
+                        _dx2dy2 = _mm256_add_ps(_dx2, _dy2);
+                        _dist2  = _mm256_add_ps(_dx2dy2, _dz2);
 
-                        // Compute distance squared
-                        __m256 _distance2 = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(_dx, _dx), _mm256_mul_ps(_dy, _dy)), _mm256_mul_ps(_dz, _dz));
-
-                        // Mask for particles within smoothing radius
-                        __m256 _mask = _mm256_cmp_ps(_distance2, _smoothing_radius2, _CMP_LT_OS);
-
-                        // Distance (with sqrt)
-                        __m256 _distance = _mm256_sqrt_ps(_distance2);
-
-                        // Direction
-                        __m256 inv_distance = _mm256_div_ps(_mm256_set1_ps(1.0f), _distance);
-                        __m256 dir_x = _mm256_mul_ps(_dx, inv_distance);
-                        __m256 dir_y = _mm256_mul_ps(_dy, inv_distance);
-                        __m256 dir_z = _mm256_mul_ps(_dz, inv_distance);
+                        // Mask particles within smoothing radius
+                        _mask1 = _mm256_cmp_ps(_dist2, _smoothing_radius2, _CMP_LT_OS);
+                        
+                        // Distance
+                        //f32 distance = sqrt(distance2);
+                        _dist = _mm256_sqrt_ps(_dist2);
+                        _inv_dist = _mm256_div_ps(_one, _dist);
 
                         // Pressure force
-                        __m256 pressure_factor = _mm256_mul_ps(_mm256_mul_ps(_mm256_mul_ps(_mm256_sub_ps(_smoothing_radius, _distance), _mm256_sub_ps(_smoothing_radius, _distance)), _mm256_sub_ps(_smoothing_radius, _distance)), _spiky_grad);
-                        pressure_factor = _mm256_mul_ps(pressure_factor, _mm256_div_ps(_mm256_add_ps(_mm256_set1_ps(pi.pressure), _pj_pressure), _mm256_mul_ps(_two, _pj_density)));
-                        pressure_factor = _mm256_mul_ps(pressure_factor, _pj_mass);
+                        // pressure_force += -direction * pj.mass * ((pi.pressure + pj.pressure) / (2.0f * pj.density)) * spiky_grad * pow(smoothing_radius - distance, 3.0f);
+                       
+                        // pow(smoothing_radius - distance, 3.0f)
+                        _radius_diff  = _mm256_sub_ps(_smoothing_radius, _dist);
+                        _radius_diff2 = _mm256_mul_ps(_radius_diff, _radius_diff);
+                        _radius_diff3 = _mm256_mul_ps(_radius_diff2, _radius_diff);
 
-                        pressure_factor = _mm256_blendv_ps(_mm256_setzero_ps(), pressure_factor, _mask);
+                        // (pi.pressure + pj.pressure)
+                        _pi_pj_pressure_add = _mm256_add_ps(_pi_pressure, _pj_pressure);
+                        // (2.0f * pj.density)
+                        _two_pj_density = _mm256_mul_ps(_two, _pj_density);
+                        // (pi.pressure + pj.pressure) / (2.0f * pj.density) 
+                        _pressure_density = _mm256_div_ps(_pi_pj_pressure_add, _two_pj_density);
+                        // pj.mass * ((pi.pressure + pj.pressure)  / (2.0f * pj.density)) 
+                        _mass_pressure_density = _mm256_mul_ps(_mass, _pressure_density);
+                        // pj.mass * ((pi.pressure + pj.pressure)  / (2.0f * pj.density)) * spiky_grad
+                        _mass_pressure_density_spiky_grad = _mm256_mul_ps(_mass_pressure_density, _spiky_grad);
+                        // pj.mass * ((pi.pressure + pj.pressure)  / (2.0f * pj.density)) * spiky_grad * pow(smoothing_radius - distance, 3.0f)
+                        _pressure_force = _mm256_mul_ps(_mass_pressure_density_spiky_grad, _radius_diff3);
+                        // if dist2 < radius2
+                        _pressure_force = _mm256_blendv_ps(_zero, _pressure_force, _mask1);
 
-                        _press_x = _mm256_fmadd_ps(pressure_factor, dir_x, _press_x);
-                        _press_y = _mm256_fmadd_ps(pressure_factor, dir_y, _press_y);
-                        _press_z = _mm256_fmadd_ps(pressure_factor, dir_z, _press_z);
+                        //vf3 direction = glm::normalize(difference);
+                        _dir_x = _mm256_mul_ps(_dx, _inv_dist);
+                        _dir_y = _mm256_mul_ps(_dy, _inv_dist);
+                        _dir_z = _mm256_mul_ps(_dz, _inv_dist);
+
+                        // pressure_force += -direction * pj.mass * ((pi.pressure + pj.pressure) / (2.0f * pj.density)) * spiky_grad * pow(smoothing_radius - distance, 3.0f);
+                        _pressure_force_x = _mm256_fmadd_ps(_pressure_force, _dir_x, _pressure_force_x);
+                        _pressure_force_y = _mm256_fmadd_ps(_pressure_force, _dir_y, _pressure_force_y);
+                        _pressure_force_z = _mm256_fmadd_ps(_pressure_force, _dir_z, _pressure_force_z);
 
                         // Viscous force
-                        __m256 visc_factor = _mm256_mul_ps(_mm256_mul_ps(_pj_mass, _viscosity), _mm256_mul_ps(_mm256_sub_ps(_smoothing_radius, _distance), _spiky_laplacian));
-                        visc_factor = _mm256_div_ps(visc_factor, _pj_density);
+                        // viscous_force += pj.mass * viscosity * ((pj.velocity - pi.velocity) / pj.density) * spiky_laplacian * (smoothing_radius - distance);
 
-                        visc_factor = _mm256_blendv_ps(_mm256_setzero_ps(), visc_factor, _mask);
+                        // (pj.velocity - pi.velocity)
+                        _dvx = _mm256_sub_ps(_pj_vx, _pi_vx);
+                        _dvy = _mm256_sub_ps(_pj_vy, _pi_vy);
+                        _dvz = _mm256_sub_ps(_pj_vz, _pi_vz);
 
-                        _visc_x = _mm256_fmadd_ps(visc_factor, _mm256_sub_ps(_vx, _mm256_set1_ps(pi.velocity.x)), _visc_x);
-                        _visc_y = _mm256_fmadd_ps(visc_factor, _mm256_sub_ps(_vy, _mm256_set1_ps(pi.velocity.y)), _visc_y);
-                        _visc_z = _mm256_fmadd_ps(visc_factor, _mm256_sub_ps(_vz, _mm256_set1_ps(pi.velocity.z)), _visc_z);
+                        // ((pj.velocity - pi.velocity) / pj.density)
+                        _dvx_density = _mm256_div_ps(_dvx, _pj_density);
+                        _dvy_density = _mm256_div_ps(_dvy, _pj_density);
+                        _dvz_density = _mm256_div_ps(_dvz, _pj_density);
 
-                        // Normal (for surface tension)
-                        _norm_x = _mm256_fmadd_ps(pressure_factor, dir_x, _norm_x);
-                        _norm_y = _mm256_fmadd_ps(pressure_factor, dir_y, _norm_y);
-                        _norm_z = _mm256_fmadd_ps(pressure_factor, dir_z, _norm_z);
+                        // viscosity * ((pj.velocity - pi.velocity) / pj.density)
+                        __m256 _viscous_comp_x = _mm256_mul_ps(_dvx_density, _viscosity);
+                        __m256 _viscous_comp_y = _mm256_mul_ps(_dvy_density, _viscosity);
+                        __m256 _viscous_comp_z = _mm256_mul_ps(_dvz_density, _viscosity);
+
+                        _viscous_comp_x = _mm256_mul_ps(_viscous_comp_x, _mass);
+                        _viscous_comp_y = _mm256_mul_ps(_viscous_comp_y, _mass);
+                        _viscous_comp_z = _mm256_mul_ps(_viscous_comp_z, _mass);
+
+                        _viscous_comp_x = _mm256_mul_ps(_viscous_comp_x, _spiky_laplacian);
+                        _viscous_comp_y = _mm256_mul_ps(_viscous_comp_y, _spiky_laplacian);
+                        _viscous_comp_z = _mm256_mul_ps(_viscous_comp_z, _spiky_laplacian);
+
+                        _viscous_comp_x = _mm256_mul_ps(_viscous_comp_x, _radius_diff);
+                        _viscous_comp_y = _mm256_mul_ps(_viscous_comp_y, _radius_diff);
+                        _viscous_comp_z = _mm256_mul_ps(_viscous_comp_z, _radius_diff);
+
+                        // Apply the mask to the viscous force components
+                        _viscous_comp_x = _mm256_blendv_ps(_zero, _viscous_comp_x, _mask1);
+                        _viscous_comp_y = _mm256_blendv_ps(_zero, _viscous_comp_y, _mask1);
+                        _viscous_comp_z = _mm256_blendv_ps(_zero, _viscous_comp_z, _mask1);
+
+                        // viscous_force += pj.mass * viscosity * ((pj.velocity - pi.velocity) / pj.density) * spiky_laplacian * (smoothing_radius - distance);
+                        _viscous_force_x = _mm256_add_ps(_viscous_force_x, _viscous_comp_x);
+                        _viscous_force_y = _mm256_add_ps(_viscous_force_y, _viscous_comp_y);
+                        _viscous_force_z = _mm256_add_ps(_viscous_force_z, _viscous_comp_z);
+
+                        // Normal
+                        //_normal_x = _mm256_fmadd_ps(_pressure_force, dir_x, _normal_x);
+                        //_normal_y = _mm256_fmadd_ps(_pressure_force, dir_y, _normal_y);
+                        //_normal_z = _mm256_fmadd_ps(_pressure_force, dir_z, _normal_z);
                     }
                 }
             }
         }
 
-        // Final forces and acceleration
-        __m256 curvature = _mm256_sqrt_ps(_mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(_norm_x, _norm_x), _mm256_mul_ps(_norm_y, _norm_y)), _mm256_mul_ps(_norm_z, _norm_z)));
-        curvature = _mm256_sub_ps(_mm256_set1_ps(0.0f), curvature);
+        //f32 curvature = -glm::length(normal);
+        //if (curvature > 0.0f)
+            //surface_tension_force = -settings.surface_tension_constant * curvature * settings.spiky_laplacian * glm::normalize(normal);
+        
+        // Recalculate norm vector using density gradient for surface tension
+        /*
+        _norm_mag = _mm256_sqrt_ps(
+            _mm256_add_ps(
+                _mm256_add_ps(
+                    _mm256_mul_ps(_normal_x, _normal_x), 
+                    _mm256_mul_ps(_normal_y, _normal_y)), 
+                _mm256_mul_ps(_normal_z, _normal_z)
+            ));
+        
+        __m256 _epsilon = _mm256_set1_ps(1e-6f);
+        _norm_mag = _mm256_max_ps(_norm_mag, _epsilon);
+        _inv_norm_mag = _mm256_div_ps(_one, _norm_mag);
 
-        if (_mm256_movemask_ps(_mm256_cmp_ps(curvature, _mm256_set1_ps(0.0f), _CMP_GT_OS)))
-        {
-            _surf_x = _mm256_mul_ps(curvature, _norm_x);
-            _surf_y = _mm256_mul_ps(curvature, _norm_y);
-            _surf_z = _mm256_mul_ps(curvature, _norm_z);
-        }
+        // Normalize the normal vector
+        _inv_norm_mag = _mm256_div_ps(_one, _norm_mag);
+        _norm_x_unit = _mm256_mul_ps(_normal_x, _inv_norm_mag);
+        _norm_y_unit = _mm256_mul_ps(_normal_y, _inv_norm_mag);
+        _norm_z_unit = _mm256_mul_ps(_normal_z, _inv_norm_mag);
+
+        // Surface tension curvature
+        _curvature  = _mm256_sub_ps(_zero, _norm_mag); // Negative curvature indicates a concave surface
+        _mask2 = _mm256_cmp_ps(_curvature, _zero, _CMP_GT_OS);
+        */
+
+        // Surface tension forces
+        //_surface_tension_x = _mm256_blendv_ps(_surface_tension_x, _mm256_mul_ps(_curvature, _norm_x_unit), _mask2);
+        //_surface_tension_y = _mm256_blendv_ps(_surface_tension_y, _mm256_mul_ps(_curvature, _norm_y_unit), _mask2);
+        //_surface_tension_z = _mm256_blendv_ps(_surface_tension_z, _mm256_mul_ps(_curvature, _norm_z_unit), _mask2);
 
         // Update particle acceleration
-        _acc_x = _mm256_add_ps(_acc_x, _mm256_div_ps(_mm256_add_ps(_mm256_add_ps(_press_x, _visc_x), _surf_x), _mm256_set1_ps(pi.density)));
-        _acc_y = _mm256_add_ps(_acc_y, _mm256_div_ps(_mm256_add_ps(_mm256_add_ps(_press_y, _visc_y), _surf_y), _mm256_set1_ps(pi.density)));
-        _acc_z = _mm256_add_ps(_acc_z, _mm256_div_ps(_mm256_add_ps(_mm256_add_ps(_press_z, _visc_z), _surf_z), _mm256_set1_ps(pi.density)));
+        // pi.acceleration += (pressure_force + viscous_force + surface_tension_force) / pi.density + gravity_force;
 
-        _acc_x = _mm256_add_ps(_acc_x, _gravity_force_x);
-        _acc_y = _mm256_add_ps(_acc_y, _gravity_force_y);
-        _acc_z = _mm256_add_ps(_acc_z, _gravity_force_z);
+        // Update Pressure Force
+        // acceleration += pressure_force
+        _acceleration_x = _mm256_add_ps(_acceleration_x, _pressure_force_x);
+        _acceleration_y = _mm256_add_ps(_acceleration_y, _pressure_force_y);
+        _acceleration_z = _mm256_add_ps(_acceleration_z, _pressure_force_z);
 
-        // Store results back to particle
-        _mm256_storeu_ps(&pi.acceleration.x, _acc_x);
-        _mm256_storeu_ps(&pi.acceleration.y, _acc_y);
-        _mm256_storeu_ps(&pi.acceleration.z, _acc_z);
+        // acceleration += viscous_force
+        _acceleration_x = _mm256_add_ps(_acceleration_x, _viscous_force_x);
+        _acceleration_y = _mm256_add_ps(_acceleration_y, _viscous_force_y);
+        _acceleration_z = _mm256_add_ps(_acceleration_z, _viscous_force_z);
+
+        // acceleration /= pi.density
+        _acceleration_x = _mm256_div_ps(_acceleration_x, _pi_density);
+        _acceleration_y = _mm256_div_ps(_acceleration_y, _pi_density);
+        _acceleration_z = _mm256_div_ps(_acceleration_z, _pi_density);
+
+        // acceleration += gravity_force
+        _acceleration_x = _mm256_add_ps(_acceleration_x, _gravity_force_x);
+        _acceleration_y = _mm256_add_ps(_acceleration_y, _gravity_force_y);
+        _acceleration_z = _mm256_add_ps(_acceleration_z, _gravity_force_z);
+
+        // Store the results from SIMD registers to arrays
+        f32 acceleration_x[8] = { 0.0f };
+        f32 acceleration_y[8] = { 0.0f };
+        f32 acceleration_z[8] = { 0.0f };
+        _mm256_storeu_ps(acceleration_x, _acceleration_x);
+        _mm256_storeu_ps(acceleration_y, _acceleration_y);
+        _mm256_storeu_ps(acceleration_z, _acceleration_z);
+
+        // Loop through the array to store the results back to pi.acceleration for each particle
+        f32 acc_x_sum = 0.0f, acc_y_sum = 0.0f, acc_z_sum = 0.0f;
+        for (s32 j = 0; j < 8; j++)
+        {
+            if (!std::isnan(acceleration_x[j])) acc_x_sum += acceleration_x[j];
+            if (!std::isnan(acceleration_y[j])) acc_y_sum += acceleration_y[j];
+            if (!std::isnan(acceleration_z[j])) acc_z_sum += acceleration_z[j];
+        }
+
+        pi.acceleration.x += acc_x_sum;
+        pi.acceleration.y += acc_y_sum;
+        pi.acceleration.z += acc_z_sum;
     }
-
 }
 
 void SPH::Integrate(f32 dt)
@@ -445,9 +652,9 @@ void SPH::ComputeBoundaryCondition()
     {
         Particle& pi = fluid_particles[i];
 
+        /*
         // Particle Collision
         vi3 cell_origin = cell(pi, settings.smoothing_radius);
-
         for (s32 x = -1; x <= 1; x++)
         {
             for (s32 y = -1; y <= 1; y++)
@@ -496,7 +703,7 @@ void SPH::ComputeBoundaryCondition()
                 }
             }
         }
-
+        */
         // Boundary Collision
         if (pi.position.x - settings.boundary_epsilon < settings.boundary_min.x)
         {
@@ -540,10 +747,15 @@ void SPH::CreateNeighborTable()
     // Create Neighbor Table
     particle_table.clear();
     particle_table.resize(TABLE_SIZE);
+    u32 prev_hash = NO_PARTICLE;
     for (s32 i = 0; i < fluid_particles.size(); i++)
     {
         u32 current_hash = fluid_particles[i].hash;
-        particle_table[current_hash].push_back(i);
+        if (current_hash != prev_hash)
+        {
+            particle_table[current_hash].push_back(i);
+            prev_hash = current_hash;
+        }
     }
 }
 

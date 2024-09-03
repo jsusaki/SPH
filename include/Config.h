@@ -10,7 +10,7 @@ static const f32 PI = 3.14159265358979323846f;
 namespace config
 {
     // Simulation
-    static const s32 NUM_PARTICLES = 25000;
+    static const s32 NUM_PARTICLES = 5000;
     static const f32 REST_DENSITY = 997.0f;
     static const f32 GAS_CONSTANT = 1.0f;    // Gas Constant, or stiffness control the particle spread, make 5 to implode
     static const f32 VISCOSITY = 0.002f;  // Kinematic Viscosity
@@ -31,7 +31,7 @@ namespace config
     static const vf3 BOUNDARY_MIN = -BOUNDARY;
     static const vf3 BOUNDARY_MAX = BOUNDARY;
     // Hash map
-    const u32 TABLE_SIZE = NUM_PARTICLES * 2; //262144;
+    const u32 TABLE_SIZE = 262144; //NUM_PARTICLES * 2; //262144;
     const u32 NO_PARTICLE = 0xFFFFFFFF;
 }
 

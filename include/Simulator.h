@@ -55,9 +55,8 @@ private: // Simulator variables
     Window window;
 
     // Input
-    vf2 mouse_pos;
-    vf2 prev_mouse_pos;
-    bool mouse_control = true;
+    vf2 mouse_pos_transformed = {};
+    vf2 prev_mouse_pos_transformed = {};
 
 private: // Simulation variables
     // Camera
@@ -86,6 +85,7 @@ private: // Simulation variables
     };
     State current_state = State::PAUSE;
     State next_state    = State::PAUSE;
+    s32 n_steps = 0;
 
     // GUI
     GUI gui;

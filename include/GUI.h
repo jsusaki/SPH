@@ -25,6 +25,7 @@ public:
         // Setup Platform/Renderer backends
         ImGui_ImplGlfw_InitForOpenGL(window, true);
         ImGui_ImplOpenGL3_Init("#version 130");
+        ImGui::SetNextWindowFocus();
 	}
 
     void DisplaySettings(SPHSettings& s)
@@ -40,7 +41,7 @@ public:
 
             ImGui::SliderInt("Number of Particles",        &s.n_particles,                  1000,   25000);
             ImGui::SliderFloat("Rest Density",             &s.rest_density,                 0.001f, 1000.0f);
-            ImGui::SliderFloat("Gas Constant",             &s.gas_constant,                 0.001f, 5.0f);
+            ImGui::SliderFloat("Gas Constant",             &s.gas_constant,                 0.001f, 10.0f);
             ImGui::SliderFloat("Kinematic Viscosity",      &s.viscosity,                    0.001f, 10.0f);
             ImGui::SliderFloat("Surface Tension Constant", &s.surface_tension_constant,     0.0000001f, 0.1f);
             ImGui::SliderFloat("Mass",                     &s.mass,                         0.001f, 10.0f);
@@ -49,14 +50,9 @@ public:
             ImGui::SliderFloat("Boundary Damping",         &s.boundary_damping,             -1.0f,   1.0f);
             ImGui::SliderFloat3("Boudary Size",            glm::value_ptr(s.boundary_size), 0.1f,   1.0f);
 
-            if (ImGui::Button("Apply")) 
-                apply_pressed = true;
-
-            if (ImGui::Button("Reset"))
-                reset_pressed = true;
-
-            if (ImGui::Button("Restart"))
-                restart_pressed = true;
+            if (ImGui::Button("Apply"))   apply_pressed = true;
+            if (ImGui::Button("Reset"))   reset_pressed = true;
+            if (ImGui::Button("Restart")) restart_pressed = true;
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
             ImGui::End();
@@ -75,6 +71,8 @@ public:
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
     }
+
+    bool IsWindowFocused() const { return ImGui::IsWindowFocused(ImGuiFocusedFlags_AnyWindow); }
 
     bool IsApplyPressed() const { return apply_pressed; }
     void ClearApplyRequest() { apply_pressed = false; }

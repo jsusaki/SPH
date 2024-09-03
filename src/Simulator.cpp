@@ -82,7 +82,6 @@ void Simulator::Create()
     f32 aspect = static_cast<f32>(SCREEN_WIDTH) / SCREEN_HEIGHT;
     camera = ArcballCamera(eye, center, up, fov, aspect, near, far);
     
-
     // Create SPH System Settings
     default_settings = {
         // Simulation parameters
@@ -90,10 +89,10 @@ void Simulator::Create()
         .rest_density = 1000.0f,
         .gas_constant = 1.0f,
         .viscosity    = 0.005f,
-        .surface_tension_constant = 0.00001f,
+        .surface_tension_constant = 0.0001f,
         .gravity      = { 0.0f, -9.80665f, 0.0f },
-        .mass         = 0.01f,
-        .dt           = 0.0001f,
+        .mass         = 0.02f,
+        .dt           = 0.01f,
         // Smoothing Kernel
         .smoothing_radius  = SMOOTHING_RADIUS,
         .smoothing_radius2 = std::pow(SMOOTHING_RADIUS, 2.0f),
@@ -102,7 +101,7 @@ void Simulator::Create()
         .spiky_laplacian   =  45.0f / (PI * std::pow(SMOOTHING_RADIUS, 6.0f)),
         // Boundary
         .boundary_epsilon = 0.0000001f,
-        .boundary_damping = -0.2f,
+        .boundary_damping = -0.4f,
         .boundary_size = { 0.6f, 0.6f, 0.6f },
         .boundary_min  = {-0.6f,-0.6f,-0.6f },
         .boundary_max  = { 0.6f, 0.6f, 0.6f },
@@ -110,9 +109,8 @@ void Simulator::Create()
     sph.Init(default_settings);
     current_settings = default_settings;
 
-
     // Create Particle Models
-    mesh sphere_mesh("./res/models/icosphere.obj");
+    mesh sphere_mesh("./res/models/sphere.obj");
     std::vector<Particle>& particles = sph.GetParticles();
     particle_models.reserve(particles.size());
     for (auto& p : particles)
@@ -157,7 +155,7 @@ void Simulator::ProcessInput()
             next_state = State::PAUSE;
     }
     // Step the simulation
-    if (input.IsKeyHeld(GLFW_KEY_S))
+    if (input.IsKeyPressed(GLFW_KEY_S))
         next_state = State::STEP;
     // Reset the simulation to default state
     if (input.IsKeyPressed(GLFW_KEY_R) || gui.IsResetPressed())
@@ -168,7 +166,6 @@ void Simulator::ProcessInput()
     // Restart the current simulation
     if (input.IsKeyPressed(GLFW_KEY_T) || gui.IsRestartPressed())
         next_state = State::RESTART;
-
     // Reset Camera
     if (input.IsKeyPressed(GLFW_KEY_C))
     {
@@ -177,38 +174,33 @@ void Simulator::ProcessInput()
         vf3 up     = { 0.0f, 1.0f, 0.0f };
         camera.init(eye, center, up);
     }
-    
-    // Activate or deactivate mouse focus
-    if (input.IsKeyPressed(GLFW_KEY_TAB))
-        mouse_control = !mouse_control;
 
     // Mouse control
-    if (mouse_control)
+    // TODO: incorporate into camera
+    mouse_pos_transformed = transform_mouse(input.GetMouse());
+    if (!gui.IsWindowFocused())
     {
-        mouse_pos = transform_mouse(input.mouse_pos);
-        if (prev_mouse_pos != (vf2(-2.0f)))
+        if (prev_mouse_pos_transformed != (vf2(-2.0f)))
         {
             if (input.IsButtonPressed(GLFW_MOUSE_BUTTON_LEFT))
             {
-                camera.rotate(prev_mouse_pos, mouse_pos);
+                camera.rotate(prev_mouse_pos_transformed, mouse_pos_transformed);
             }
             if (input.IsButtonPressed(GLFW_MOUSE_BUTTON_RIGHT))
             {
                 // TODO: incorporate into camera
-                vf2 dxy  = mouse_pos - prev_mouse_pos;
+                vf2 dxy  = mouse_pos_transformed - prev_mouse_pos_transformed;
                 vf4 dxy4 = camera.inv_projection() * vf4(dxy.x, dxy.y, 0.0f, 1.0f);
                 camera.pan(vf2(dxy4.x, dxy4.y));
             }
         }
-
-        prev_mouse_pos = mouse_pos;
-
-        if (input.mouse_wheel_delta != 0)
+        if (input.GetMouseWheel() != 0)
         {
-            camera.zoom(input.mouse_wheel_delta * 0.1f);
-            input.mouse_wheel_delta = 0;
+            camera.zoom(input.GetMouseWheel() * 0.1f);
+            input.ResetMouseWheel();
         }
     }
+    prev_mouse_pos_transformed = mouse_pos_transformed;
 
     // Update input state
     input.Update();
@@ -224,7 +216,8 @@ void Simulator::Simulate(f32 dt)
     case State::SIMULATE:
     case State::STEP:
     {
-        sph.Simulate(dt);
+        sph.Simulate(current_settings.dt);
+        n_steps++;
         std::vector<Particle>& particles = sph.GetParticles();
         for (s32 i = 0; i < particles.size(); i++)
             particle_models[i].translate(particles[i].position);
@@ -238,6 +231,7 @@ void Simulator::Simulate(f32 dt)
         current_settings = default_settings;
         gui.ClearResetRequest();
         next_state = State::PAUSE;
+        n_steps = 0;
         break;
     }
 
@@ -246,6 +240,7 @@ void Simulator::Simulate(f32 dt)
         ResetSimulation(current_settings);
         gui.ClearApplyRequest();
         next_state = State::PAUSE;
+        n_steps = 0;
         break;
     }
 
@@ -254,6 +249,7 @@ void Simulator::Simulate(f32 dt)
         RestartSimulation();
         gui.ClearRestartRequest();
         next_state = State::PAUSE;
+        n_steps = 0;
         break;
     }
 
