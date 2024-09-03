@@ -89,6 +89,8 @@
 #include <limits>
 
 #include <immintrin.h>
+
+//#define _OPENMP_LLVM_RUNTIME
 //#include <omp.h>
 
 #include "Common.h"
