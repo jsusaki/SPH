@@ -6,6 +6,7 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "implot.h"
 
 class GUI
 {
@@ -26,35 +27,78 @@ public:
         ImGui_ImplGlfw_InitForOpenGL(window, true);
         ImGui_ImplOpenGL3_Init("#version 130");
         ImGui::SetNextWindowFocus();
+
+        // Setup ImPlot context
+        ImPlot::CreateContext();
 	}
 
-    void DisplaySettings(SPHSettings& s)
+    void Display(SPHSettings& s, ArcballCamera& c, SPHStatistics& stats)
     {
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         {
-            ImGui::Begin("SPH Settings");
+            ImGui::Begin("SPH Simulator");
 
-            ImGui::Text("Change simulation parameters. Press Reset to apply changes.");
+            // General
+            ImGui::SeparatorText("General");
 
-            ImGui::SliderInt("Number of Particles",        &s.n_particles,                  1000,   25000);
+            // Camera position
+            ImGui::Text("Eye:    x=%.3f y=%.3f z=%.3f", c.eye().x, c.eye().y, c.eye().z);
+            ImGui::Text("Up:     x=%.3f y=%.3f z=%.3f", c.up().x,  c.up().y,  c.up().z);
+            ImGui::Text("Center: x=%.3f y=%.3f z=%.3f", c.center().x, c.center().y, c.center().z);
+
+            // Frame Rate
+            ImGui::Text("FPS: average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
+            // SPH Settings
+            ImGui::SeparatorText("Settings");
+
+            ImGui::SliderInt("Number of Particles",        &s.n_particles,                  1,      25000);
             ImGui::SliderFloat("Rest Density",             &s.rest_density,                 0.001f, 1000.0f);
-            ImGui::SliderFloat("Gas Constant",             &s.gas_constant,                 0.001f, 10.0f);
+            ImGui::SliderFloat("Stiffness",                &s.stiffness,                    0.001f, 10.0f);
             ImGui::SliderFloat("Kinematic Viscosity",      &s.viscosity,                    0.001f, 10.0f);
-            ImGui::SliderFloat("Surface Tension Constant", &s.surface_tension_constant,     0.0000001f, 0.1f);
+            ImGui::SliderFloat("Surface Tension Constant", &s.surface_tension_constant,     0.000001f, 1.0f);
             ImGui::SliderFloat("Mass",                     &s.mass,                         0.001f, 10.0f);
             ImGui::SliderFloat3("Gravity",                 glm::value_ptr(s.gravity),       -10.0f, 10.0f);
-            ImGui::SliderFloat("Smoothing Radius",         &s.smoothing_radius,             0.001f, 0.1f);
+            ImGui::SliderFloat("Support Radius",           &s.support_radius,             0.001f, 0.1f);
+            ImGui::SliderFloat("Time Step",                &s.dt,                           0.0001f, 0.5f);
             ImGui::SliderFloat("Boundary Damping",         &s.boundary_damping,             -1.0f,   1.0f);
             ImGui::SliderFloat3("Boudary Size",            glm::value_ptr(s.boundary_size), 0.1f,   1.0f);
 
-            if (ImGui::Button("Apply"))   apply_pressed = true;
-            if (ImGui::Button("Reset"))   reset_pressed = true;
-            if (ImGui::Button("Restart")) restart_pressed = true;
+            apply_pressed = false; 
+            if (ImGui::Button("Apply"))   apply_pressed = true; ImGui::SameLine();
 
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+            restart_pressed = false;
+            if (ImGui::Button("Restart")) restart_pressed = true;  ImGui::SameLine();
+
+            reset_pressed = false;
+            if (ImGui::Button("Reset"))   reset_pressed = true;
+
+            ImGui::Checkbox("AVX2",             &enable_avx2);
+            ImGui::Checkbox("Show ImGui Demo",  &show_imgui_demo);
+            ImGui::Checkbox("Show ImPlot Demo", &show_implot_demo);
+
+            if (show_imgui_demo) ImGui::ShowDemoWindow();
+            if (show_implot_demo) ImPlot::ShowDemoWindow();
+            //ImGui::End();
+
+            // Density Distribution
+            ImGui::Begin("SPH Density Distribution");
+
+            static ImPlotHistogramFlags hist_flags = ImPlotHistogramFlags_Density;
+            //ImGui::SeparatorText("Density Distribution");
+            //ImGui::DragFloat2("Range min", &stats.rmin, 0.1f, 0.0f, 10.0f);
+            //ImGui::DragFloat2("Range max", &stats.rmax, 0.1f, 0.0f, 10.0f);
+            if (ImPlot::BeginPlot("Histogram"))
+            {
+                ImPlot::SetupAxes(nullptr, nullptr, ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+                ImPlot::SetNextFillStyle(IMPLOT_AUTO_COL, 0.5f);
+                ImPlot::PlotHistogram("Density", stats.densities.data(), stats.densities.size(), stats.n_bins, 1.0, ImPlotRange(), hist_flags);
+            }
+            ImPlot::EndPlot();
+
             ImGui::End();
         }
     }
@@ -67,6 +111,7 @@ public:
 
     void Shutdown()
     {
+        ImPlot::DestroyContext();
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
@@ -74,16 +119,20 @@ public:
 
     bool IsWindowFocused() const { return ImGui::IsWindowFocused(ImGuiFocusedFlags_AnyWindow); }
 
-    bool IsApplyPressed() const { return apply_pressed; }
-    void ClearApplyRequest() { apply_pressed = false; }
-    bool IsResetPressed() const { return reset_pressed; }
-    void ClearResetRequest() { reset_pressed = false; }
+    bool IsApplyPressed()   const { return apply_pressed; }
+    bool IsResetPressed()   const { return reset_pressed; }
     bool IsRestartPressed() const { return restart_pressed; }
-    void ClearRestartRequest() { restart_pressed = false; }
+    bool IsAVX2Enabled()    const { return enable_avx2; }
+    void ToggleAVX2()  { enable_avx2 = !enable_avx2; }
 
 private:
     ImGuiIO io;
     bool apply_pressed = false;
     bool reset_pressed = false;
     bool restart_pressed = false;
+    bool enable_avx2 = false;
+
+    bool show_imgui_demo = false;
+
+    bool show_implot_demo = false;
 };

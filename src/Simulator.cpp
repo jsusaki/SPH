@@ -85,26 +85,30 @@ void Simulator::Create()
     // Create SPH System Settings
     default_settings = {
         // Simulation parameters
-        .n_particles  = 5000,
+        .n_particles  = 500,
         .rest_density = 1000.0f,
-        .gas_constant = 1.0f,
-        .viscosity    = 0.005f,
-        .surface_tension_constant = 0.0001f,
-        .gravity      = { 0.0f, -9.80665f, 0.0f },
+        .stiffness    = 3.0f,
+        .viscosity    = 1.0f, //0.00005f,
+        .surface_tension_constant = 0.0001f, //0.0728f
+        .gravity      = { 0.0f, 0.0f, 0.0f }, //{ 0.0f, -9.80665f, 0.0f },
         .mass         = 0.02f,
-        .dt           = 0.01f,
+        .dt           = 0.02f,
+        .radius       = 0.03f,
         // Smoothing Kernel
-        .smoothing_radius  = SMOOTHING_RADIUS,
-        .smoothing_radius2 = std::pow(SMOOTHING_RADIUS, 2.0f),
-        .poly6             = 315.0f / (64.0f * PI * std::pow(SMOOTHING_RADIUS, 9.0f)),
-        .spiky_grad        = -45.0f / (PI * std::pow(SMOOTHING_RADIUS, 6.0f)),
-        .spiky_laplacian   =  45.0f / (PI * std::pow(SMOOTHING_RADIUS, 6.0f)),
+        .support_radius    = 0.04f,
+        .support_radius2   = std::pow(SMOOTHING_RADIUS, 2.0f),
+        .poly6               =  315.0f / (64.0f * PI * std::pow(SMOOTHING_RADIUS, 9.0f)),
+        .poly6_grad          = -945.0f / (32.0f * PI * std::pow(SMOOTHING_RADIUS, 9.0f)),
+        .spiky_grad          = -45.0f / (PI * std::pow(SMOOTHING_RADIUS, 6.0f)),
+        .viscosity_laplacian =  45.0f / (PI * std::pow(SMOOTHING_RADIUS, 6.0f)),
         // Boundary
         .boundary_epsilon = 0.0000001f,
-        .boundary_damping = -0.4f,
+        .boundary_damping = -0.6f,
         .boundary_size = { 0.6f, 0.6f, 0.6f },
         .boundary_min  = {-0.6f,-0.6f,-0.6f },
         .boundary_max  = { 0.6f, 0.6f, 0.6f },
+        // GFX
+        .sphere_scale = 0.0125f
     };
     sph.Init(default_settings);
     current_settings = default_settings;
@@ -118,7 +122,11 @@ void Simulator::Create()
         model sphere_model = model(sphere_mesh);
         sphere_model.translate(p.position);
         // gfx config
-        sphere_model.scale({ 0.01f, 0.01f, 0.01f });
+        sphere_model.scale({ 
+            default_settings.sphere_scale,
+            default_settings.sphere_scale,
+            default_settings.sphere_scale
+        });
         particle_models.push_back(sphere_model);
     }
 
@@ -166,14 +174,38 @@ void Simulator::ProcessInput()
     // Restart the current simulation
     if (input.IsKeyPressed(GLFW_KEY_T) || gui.IsRestartPressed())
         next_state = State::RESTART;
-    // Reset Camera
-    if (input.IsKeyPressed(GLFW_KEY_C))
+    // Fixed Camera Positions
+    if (input.IsKeyPressed(GLFW_KEY_1))
     {
         vf3 eye    = { 1.5f, 0.0f, 0.0f };
         vf3 center = { 0.0f, 0.0f, 0.0f };
         vf3 up     = { 0.0f, 1.0f, 0.0f };
         camera.init(eye, center, up);
     }
+    if (input.IsKeyPressed(GLFW_KEY_2))
+    {
+        vf3 eye    = { 0.0f, 0.5f, 0.0f };
+        vf3 center = { 0.0f, 0.0f, 0.0f };
+        vf3 up     = { 1.0f, 0.0f, 0.0f };
+        camera.init(eye, center, up);
+    }
+    if (input.IsKeyPressed(GLFW_KEY_3))
+    {
+        vf3 eye    = { 1.5f, 1.5f, 1.5f };
+        vf3 center = { 0.0f, 0.0f, 0.0f };
+        vf3 up     = { 0.0f, 1.0f, 0.0f };
+        camera.init(eye, center, up);
+    }
+    if (input.IsKeyPressed(GLFW_KEY_4))
+    {
+        vf3 eye    = { 1.025f, -0.005f, 1.535f };
+        vf3 center = { 0.6f, 0.01f, 0.4f };
+        vf3 up     = { -0.005f, 1.0f, 0.015f };
+        camera.init(eye, center, up);
+    }
+    // AVX2
+    if (input.IsKeyPressed(GLFW_KEY_X)) gui.ToggleAVX2();
+    sph.SetAVX2(gui.IsAVX2Enabled());
 
     // Mouse control
     // TODO: incorporate into camera
@@ -200,23 +232,25 @@ void Simulator::ProcessInput()
             input.ResetMouseWheel();
         }
     }
+
     prev_mouse_pos_transformed = mouse_pos_transformed;
 
     // Update input state
     input.Update();
-
-    // Update GUI
-    gui.DisplaySettings(current_settings);
 }
 
 void Simulator::Simulate(f32 dt)
 {
+    // Update GUI
+    gui.Display(current_settings, camera, sph.GetStats());
+
+    // Update simulation state
     switch (current_state)
     {
     case State::SIMULATE:
     case State::STEP:
     {
-        sph.Simulate(current_settings.dt);
+        sph.Simulate(current_settings);
         n_steps++;
         std::vector<Particle>& particles = sph.GetParticles();
         for (s32 i = 0; i < particles.size(); i++)
@@ -224,41 +258,35 @@ void Simulator::Simulate(f32 dt)
         if (current_state == State::STEP)
             next_state = State::PAUSE;
         break;
-    }
+    } 
     case State::RESET:
     {
         ResetSimulation(default_settings);
         current_settings = default_settings;
-        gui.ClearResetRequest();
         next_state = State::PAUSE;
         n_steps = 0;
         break;
-    }
-
+    } 
     case State::APPLY:
     {
         ResetSimulation(current_settings);
-        gui.ClearApplyRequest();
         next_state = State::PAUSE;
         n_steps = 0;
         break;
-    }
-
+    } 
     case State::RESTART:
     {
         RestartSimulation();
-        gui.ClearRestartRequest();
         next_state = State::PAUSE;
         n_steps = 0;
         break;
-    }
-
+    } 
     case State::PAUSE:
         break;
-
     default:
         break;
     }
+
     current_state = next_state;
 }
 
@@ -320,7 +348,11 @@ void Simulator::ResetSimulation(const SPHSettings& settings)
     {
         model sphere_model = model(sphere_mesh);
         sphere_model.translate(p.position);
-        sphere_model.scale({ 0.01f, 0.01f, 0.01f });
+        sphere_model.scale({
+            settings.sphere_scale,
+            settings.sphere_scale,
+            settings.sphere_scale
+            });
         particle_models.push_back(sphere_model);
     }
 }

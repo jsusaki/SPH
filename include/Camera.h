@@ -14,19 +14,20 @@ public:
     void zoom(const f32 zoom_amount);
     void translate(vf3 position);
 
-    const mf4x4& transform() const;
-    const mf4x4& inv_transform() const;
-    const mf4x4& projection() const;
+    const mf4x4& transform()      const;
+    const mf4x4& inv_transform()  const;
+    const mf4x4& projection()     const;
     const mf4x4& inv_projection() const;
-    const mf4x4 proj_camera() const;
+    const mf4x4  proj_camera()    const;
 
-    vf3 eye() const;
-    vf3 dir() const;
-    vf3 up() const;
+    vf3 eye()    const;
+    vf3 dir()    const;
+    vf3 up()     const;
+    vf3 center() const;
 
 private:
-    void update_projection(f32 fov, f32 aspect, f32 near, f32 far);
     void update_camera();
+    void update_projection(f32 fov, f32 aspect, f32 near, f32 far);
 
 private:
     mf4x4 center_translation;

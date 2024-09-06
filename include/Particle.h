@@ -12,5 +12,6 @@ struct Particle
     f32 pressure;
     f32 viscosity;
     f32 radius;
+    f32 support_radius;
     u32 hash;
 };

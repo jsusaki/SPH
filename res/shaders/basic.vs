@@ -16,6 +16,6 @@ void main()
 	vs_position = vec3(model * vec4(position, 1.0));
 	vs_normal   = mat3(transpose(inverse(model))) * normal;
 	vs_color    = color;
-
+	
 	gl_Position = proj_view * vec4(vs_position, 1.0f);
 }

@@ -88,10 +88,12 @@
 #include <iostream>
 #include <limits>
 
-#include <immintrin.h>
 
 //#define _OPENMP_LLVM_RUNTIME
 //#include <omp.h>
+
+#include <immintrin.h>
+#define AVX2
 
 #include "Common.h"
 #include "Random.h"
@@ -103,19 +105,21 @@ struct SPHSettings
     // Simulation
     s32 n_particles;
     f32 rest_density;
-    f32 gas_constant;
+    f32 stiffness;
     f32 viscosity;
     f32 surface_tension_constant;
     vf3 gravity;
     f32 mass;
     f32 dt;
+    f32 radius;
 
     // Smoothing Kernel
-    f32 smoothing_radius;
-    f32 smoothing_radius2;
+    f32 support_radius;
+    f32 support_radius2;
     f32 poly6;
+    f32 poly6_grad;
     f32 spiky_grad;
-    f32 spiky_laplacian;
+    f32 viscosity_laplacian;
 
     // Boundary
     f32 boundary_epsilon;
@@ -123,7 +127,18 @@ struct SPHSettings
     vf3 boundary_size;
     vf3 boundary_min;
     vf3 boundary_max;
+
+    // GFX
+    f32 sphere_scale;
 };
+
+struct SPHStatistics
+{
+    std::vector<f32> densities;
+    s32 n_bins = 100;
+    f32 rmin = 0.0f, rmax = 0.0f;
+};
+
 
 class SPH
 {
@@ -133,7 +148,7 @@ public:
 
 public:
     void Init(const SPHSettings& s);
-    void Simulate(f32 dt);
+    void Simulate(const SPHSettings& s);
 
 public:
     void ComputeDensityPressure();
@@ -145,17 +160,26 @@ public:
     void Integrate(f32 dt);
     void ComputeBoundaryCondition();
 
+    void SetAVX2(bool active)  { avx2 = active; }
+
 public:
     std::vector<Particle>& GetParticles();
+    SPHStatistics& GetStats();
 
 private:
     SPHSettings settings;
     std::vector<Particle> fluid_particles;
     //std::vector<particle> boundary_particles; // TODO: will be introduced
+    bool avx2 = false;
+
+private:
+    void ComputeStats();
+    SPHStatistics stats;
 
 private: // Spatial hash map
     void CreateNeighborTable();
     std::vector<std::vector<u32>> particle_table;
     vi3 cell(const Particle& p, f32 h);
     u32 hash(const vi3& cell);
+
 };

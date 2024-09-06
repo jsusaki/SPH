@@ -25,8 +25,8 @@ void ArcballCamera::init(const vf3& eye, const vf3& center, const vf3& up)
     x = glm::normalize(glm::cross(z, y));
 
     center_translation = glm::inverse(glm::translate(center));
-    translation = glm::translate(vf3(0.0f, 0.0f, -glm::length(dir)));
-    rotation = glm::normalize(glm::quat_cast(glm::transpose(mf3x3(x, y, -z))));
+    translation        = glm::translate(vf3(0.0f, 0.0f, -glm::length(dir)));
+    rotation           = glm::normalize(glm::quat_cast(glm::transpose(mf3x3(x, y, -z))));
 
     update_camera();
 }
@@ -97,6 +97,11 @@ vf3 ArcballCamera::up() const
     return glm::normalize(vf3{ inv_camera * vf4{0, 1, 0, 0} });
 }
 
+vf3 ArcballCamera::center() const
+{
+    return -vf3{ center_translation[3][0], center_translation[3][1], center_translation[3][2] };
+}
+
 const mf4x4& ArcballCamera::projection() const
 {
     return proj;
@@ -128,7 +133,7 @@ void ArcballCamera::update_projection(f32 fov, f32 aspect, f32 near, f32 far)
 
 glm::quat screen_to_arcball(const vf2& p)
 {
-    const float dist = glm::dot(p, p);
+    const f32 dist = glm::dot(p, p);
     // If we're on/in the sphere return the point on it
     if (dist <= 1.0f) 
     {
