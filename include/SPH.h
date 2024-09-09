@@ -20,6 +20,9 @@
             f32 pressure;
             f32 viscosity;
             f32 radius;
+
+            f32 support_radius;
+            u32 hash;
         };
 
         std::vector<Particle> particles;
@@ -43,22 +46,25 @@
         Smoothing Kernel
             Density:   Poly6 Kernel
             Pressure:  Spikey Kernel Grad 
-            Viscosity: Spikey Kernel Laplacian
-            Surface Tension: 
+            Viscosity: Viscosity Kernel Laplacian
+            Surface Tension: Poly6 Kernel Grad
 
         Neighborhood Search
-            Spatial Hash Grid
+            Spatial Hash Map
+            Grid Search
 
         Marching Cubes
-        Point Splatting
+
+        Spray
         Bubbles
         Foam
 
     ----------
     References
     ----------
-        SPH
+        Smoothed Particle Hydrodynamics 
             1. Particle-Based Fluid Simulation for Interactive Applications: https://matthias-research.github.io/pages/publications/sca03.pdf
+            
             2. Versatile Surface Tension and Adhesion for SPH Fluids: https://cg.informatik.uni-freiburg.de/publications/2013_SIGGRAPHASIA_surfaceTensionAdhesion.pdf
             3. GPU Fluid Simulation: https://wickedengine.net/2018/05/scalabe-gpu-fluid-simulation
             
@@ -88,22 +94,25 @@
 #include <iostream>
 #include <limits>
 
-
-//#define _OPENMP_LLVM_RUNTIME
-//#include <omp.h>
-
-#include <immintrin.h>
-#define AVX2
-
 #include "Common.h"
 #include "Random.h"
 #include "Particle.h"
 #include "Config.h"
 
+// Parallel Computation Flags
+//#define OMP
+//#include <omp.h>
+//#define _OPENMP_LLVM_RUNTIME
+
+//#define AVX2
+#include <immintrin.h>
+
+
 struct SPHSettings
 {
     // Simulation
     s32 n_particles;
+    f32 initial_particle_density;
     f32 rest_density;
     f32 stiffness;
     f32 viscosity;
@@ -130,6 +139,8 @@ struct SPHSettings
 
     // GFX
     f32 sphere_scale;
+    f32 particle_spacing;
+    vf3 cube_offset;
 };
 
 struct SPHStatistics
@@ -169,14 +180,14 @@ public:
 private:
     SPHSettings settings;
     std::vector<Particle> fluid_particles;
-    //std::vector<particle> boundary_particles; // TODO: will be introduced
     bool avx2 = false;
 
+    //std::vector<particle> boundary_particles; // TODO: will be introduced at some point
 private:
-    void ComputeStats();
+    void ComputeStatistics();
     SPHStatistics stats;
 
-private: // Spatial hash map
+private: // Spatial Hash Map
     void CreateNeighborTable();
     std::vector<std::vector<u32>> particle_table;
     vi3 cell(const Particle& p, f32 h);

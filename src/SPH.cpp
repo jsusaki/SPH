@@ -1,5 +1,35 @@
 #include "SPH.h"
 
+// Correctness
+    // TODO: Review Particle Collision Physics
+    // TODO: Debugging Info (support velocity field color, support radius color, collision contact point color)
+        // DONE: Velocity Field Color
+    // TODO: Density, Pressure Intrinsics
+    // TODO: Pressure Force + Viscosity Force + Surface Tension Intrinsics
+
+// Graphics
+    // DONE: Velocity-based Particle Color
+    // TODO: Ability to change color palette
+    // TODO: Density-based Particle Radius Color
+    // TODO: Marching Cube Algorithm for surface polygon mesh generation
+    // TODO: Fluid Simulation Scenes: Dam Break, etc.
+    // TODO: Teapot Scene, Bruce Lee, Be formless, shapeless, like water be water my friend
+    // TODO: Light Shader
+
+// Optimization
+    // TODO: Boundary Condition: Collision SIMD
+    // TODO: Spatial Hash Grid Search
+    // TODO: SPH in Cuda
+
+// Refactor
+    // TODO: Particle Collision code transform into optimal form
+    // TODO: Shader Management
+
+// Features
+    // TODO: Real-time Particle Repositioning
+    // TODO: Mouse Right Button Force interaction
+    // TODO: Interpolate Camera Positions
+    // TODO: Physics-Informed Neural Network in C++ and CUDA
 
 SPH::SPH() {}
 
@@ -8,34 +38,39 @@ SPH::SPH(const SPHSettings& s) { Init(s); }
 void SPH::Init(const SPHSettings& s)
 {
     settings = s;
+
+    // TODO: real-time particle repositioning
+
     // Initialize Fluid Particles
     fluid_particles.clear();
     fluid_particles.reserve(settings.n_particles);
-    s32 grid_size = static_cast<s32>(std::cbrt(settings.n_particles));
-    std::printf("grid_size=%d\n", grid_size);
-    f32 offset = settings.support_radius * 0.80f;
-    f32 half_grid_size = (grid_size - 1) * offset / 2.0f;
 
-    for (s32 x = 0; x < grid_size; x++)
+    // Particle spacing
+    // Cube root to define the number of particles
+    s32 cube_size      = static_cast<s32>(std::cbrt(settings.n_particles));
+    f32 offset         = settings.radius + s.particle_spacing;
+    f32 half_cube_size = (cube_size - 1) * offset / 2.0f;
+
+    for (s32 x = 0; x < cube_size; x++)
     {
-        for (s32 y = 0; y < grid_size; y++)
+        for (s32 y = 0; y < cube_size; y++)
         {
-            for (s32 z = 0; z < grid_size; z++)
+            for (s32 z = 0; z < cube_size; z++)
             {
                 if (fluid_particles.size() >= settings.n_particles)
                     break;
 
                 Particle p;
                 p.position = {
-                    x * offset - half_grid_size,
-                    y * offset - half_grid_size + 0.25f,
-                    z * offset - half_grid_size,
+                    x * offset - half_cube_size + s.cube_offset.x,
+                    y * offset - half_cube_size + s.cube_offset.y,
+                    z * offset - half_cube_size + s.cube_offset.z,
                 };
                 p.velocity     = { 0.0f, 0.0f, 0.0f };
                 p.acceleration = { 0.0f, 0.0f, 0.0f };
                 p.mass         = s.mass;
                 p.pressure     = 0.0f;
-                p.density      = s.rest_density;
+                p.density      = s.initial_particle_density;
                 p.radius       = s.radius;
                 p.support_radius = s.support_radius;
                 p.viscosity    = s.viscosity;
@@ -46,6 +81,10 @@ void SPH::Init(const SPHSettings& s)
         }
     }
 
+    // Debug
+    std::printf("grid_size=%d\n",   cube_size);
+    std::printf("n_particles=%d\n", fluid_particles.size());
+
     // Sort Particles
     std::sort(fluid_particles.begin(), fluid_particles.end(), [&](const Particle& i, const Particle& j) { return i.hash < j.hash; });
 
@@ -53,6 +92,8 @@ void SPH::Init(const SPHSettings& s)
 
     // TODO: Initialize Boundary Particles (obstacle)
 
+    // Reset Statistics
+    ComputeStatistics();
 }
 
 
@@ -86,12 +127,11 @@ void SPH::Simulate(const SPHSettings& s)
         ComputePressureViscousSurfaceTensionForce();
     }
 
-
     Integrate(settings.dt);
 
     ComputeBoundaryCondition();
 
-    ComputeStats();
+    ComputeStatistics();
 }
 
 void SPH::ComputeDensityPressure()
@@ -100,7 +140,7 @@ void SPH::ComputeDensityPressure()
     {
         Particle& pi = fluid_particles[i];
 
-        pi.density = settings.rest_density;
+        pi.density  = settings.initial_particle_density;
         pi.pressure = 0.0f;
 
         // Spatial Hash Grid Search
@@ -113,6 +153,8 @@ void SPH::ComputeDensityPressure()
                 {
                     u32 cell_hash = hash(cell_origin + vi3(x, y, z));
                     const auto& neighbors = particle_table[cell_hash];
+
+                    // For each neighbor, compute the density
                     for (s32 j = 0; j < neighbors.size(); j++)
                     {
                         Particle& pj = fluid_particles[neighbors[j]];
@@ -120,6 +162,7 @@ void SPH::ComputeDensityPressure()
                         if (&pi == &pj || cell_hash != pj.hash)
                             continue;
 
+                        // Compute density for particles within the support radius
                         f32 dist2 = glm::distance2(pj.position, pi.position);
                         if (dist2 <= settings.support_radius2)
                         {
@@ -129,38 +172,41 @@ void SPH::ComputeDensityPressure()
                 }
             }
         }
+
+        // Compute pressure based on density
         pi.pressure = settings.stiffness * (pi.density - settings.rest_density);
     }
 }
 
 void SPH::ComputeDensityPressureIntrinsics()
 {
+    // Particle data arrays
     f32 pj_px[8] = { 0.0f }, pj_py[8] = { 0.0f }, pj_pz[8] = { 0.0f };
 
-    // 64-bit float registers
-    // Positions
+    // 32-bit float registers
     __m256 _mass, _density;
+
     __m256 _pi_px, _pi_py, _pi_pz;
     __m256 _pj_px, _pj_py, _pj_pz;
 
-    // Squared distance
     __m256 _dx, _dy, _dz, _dx2, _dy2, _dz2, _dx2dy2;
     __m256 _dist2;
-    // if condition with bitwise AND operation
+
     __m256 _mask;
-    // Kernels
+
     __m256 _poly6, _support_radius2;
-    __m256 _radius_diff, _radius_diff2, _radius_diff3, _poly6_radius_diff;
+    __m256 _dr, _dr2, _dr3, _da;
 
     // Set constants into AVX2 registers
-    _poly6 = _mm256_set1_ps(settings.poly6);
+    _mass            = _mm256_set1_ps(settings.mass);
+    _poly6           = _mm256_set1_ps(settings.poly6);
     _support_radius2 = _mm256_set1_ps(settings.support_radius2);
-    _mass = _mm256_set1_ps(settings.mass);
 
     for (s32 i = 0; i < fluid_particles.size(); i++)
     {
         Particle& pi = fluid_particles[i];
-        pi.density = settings.rest_density;
+
+        pi.density  = settings.rest_density;
         pi.pressure = 0.0f;
 
         // Set own positions
@@ -168,6 +214,7 @@ void SPH::ComputeDensityPressureIntrinsics()
         _pi_py = _mm256_set1_ps(pi.position.y);
         _pi_pz = _mm256_set1_ps(pi.position.z);
 
+        // Spatial Hash Grid Search
         vi3 cell_origin = cell(pi, settings.support_radius);
         for (s32 x = -1; x <= 1; x++)
         {
@@ -177,8 +224,12 @@ void SPH::ComputeDensityPressureIntrinsics()
                 {
                     u32 cell_hash = hash(cell_origin + vi3(x, y, z));
                     const auto& neighbors = particle_table[cell_hash];
+
+                    // For each neighbor, compute the density
                     for (s32 j = 0; j < neighbors.size(); j += 8)
                     {
+                        // Convert neighbor positions into array for SIMD
+                        // TODO: there is a better way to achieve this? Instead of Array of Structre, make Structure of Arrays?
                         for (s32 k = 0; k < 8; k++)
                         {
                             if (j + k < neighbors.size())
@@ -206,16 +257,18 @@ void SPH::ComputeDensityPressureIntrinsics()
                         _dist2  = _mm256_add_ps(_dx2dy2, _dz2);
 
                         // Mask particles within support_radius
-                        _mask = _mm256_cmp_ps(_dist2, _support_radius2, _CMP_LT_OS);
+                        _mask   = _mm256_cmp_ps(_dist2, _support_radius2, _CMP_LT_OS);
 
-                        // Compute density for particles within the support_radius
-                        //pi.density += pj.mass * settings.poly6 * pow(support_radius2- dist2, 3.0f);
-                        _radius_diff = _mm256_sub_ps(_support_radius2, _dist2);
-                        _radius_diff2 = _mm256_mul_ps(_radius_diff, _radius_diff);
-                        _radius_diff3 = _mm256_mul_ps(_radius_diff2, _radius_diff);
-                        _poly6_radius_diff = _mm256_mul_ps(_poly6, _radius_diff3);
-                        _density = _mm256_mul_ps(_mass, _poly6_radius_diff);
+                        // TODO: REINPLEMENT DENSITY, HAS SOME BUGS
 
+                        // Compute density for particles within the support radius
+                        //pi.density += pj.mass * settings.poly6 * pow(support_radius2 - dist2, 3.0f);
+                        _dr      = _mm256_sub_ps(_support_radius2, _dist2);
+                        _dr2     = _mm256_mul_ps(_dr, _dr);
+                        _dr3     = _mm256_mul_ps(_dr2, _dr);
+                        _da      = _mm256_mul_ps(_poly6, _dr3);
+                        _density = _mm256_mul_ps(_mass, _da);
+                        
                         // Apply mask to zero out the contribution for particles outside the support_radius
                         _density = _mm256_blendv_ps(_mm256_setzero_ps(), _density, _mask);
 
@@ -229,11 +282,14 @@ void SPH::ComputeDensityPressureIntrinsics()
                             if (!std::isnan(density[j]))
                                 density_sum += density[j];
                         }
+
                         pi.density += density_sum;
                     }
                 }
             }
         }
+
+        // Compute pressure based on density
         pi.pressure = settings.stiffness * (pi.density - settings.rest_density);
     }
 }
@@ -247,11 +303,13 @@ void SPH::ComputePressureViscousSurfaceTensionForce()
         pi.acceleration    = {};
         vf3 pressure_force = {};
         vf3 viscous_force  = {};
+
         vf3 surface_tension_force = {};
-        f32 surface_tension_lap = 0.0f;
-        vf3 surface_tension_grad = {};
+        f32 surface_tension_lap   = 0.0f;
+        vf3 surface_tension_grad  = {};
         vf3 gravity_force = pi.mass * settings.gravity;
 
+        // Spatial Hash Grid Search
         vi3 cell_origin = cell(pi, settings.support_radius);
         for (s32 x = -1; x <= 1; x++)
         {
@@ -268,22 +326,23 @@ void SPH::ComputePressureViscousSurfaceTensionForce()
                         if (&pi == &pj || pj.hash != cell_hash)
                             continue;
 
-                        vf3 diff = pj.position - pi.position;
+                        vf3 diff  = pj.position - pi.position;
                         f32 dist2 = glm::length2(diff);
                         if (dist2 <= settings.support_radius2)
                         {
                             f32 dist = std::sqrt(dist2);
 
-                            pressure_force       += pj.mass * ((pi.pressure + pj.pressure) / (2.0f * pj.density)) * diff * settings.spiky_grad * std::pow(settings.support_radius - dist, 3.0f) / dist;
+                            pressure_force       += pj.mass * diff * ((pi.pressure + pj.pressure) / (2.0f * pj.density)) * settings.spiky_grad * std::pow(settings.support_radius - dist, 3.0f) / dist;
                             viscous_force        += pj.mass * settings.viscosity * ((pj.velocity - pi.velocity) / pj.density) * settings.viscosity_laplacian * (settings.support_radius - dist);
                             
-                            //surface_tension_grad += (pj.mass / pj.density) * diff * settings.poly6_grad * std::pow(settings.support_radius2 - dist2, 2.0f);
-                            //surface_tension_lap  += (pj.mass / pj.density) * settings.poly6_grad * (settings.support_radius2 - dist2) * (3.0f * settings.support_radius2 - 7.0f * dist2);
+                            surface_tension_grad += (pj.mass / pj.density) * diff * settings.poly6_grad * std::pow(settings.support_radius2 - dist2, 2.0f);
+                            surface_tension_lap  += (pj.mass / pj.density) * settings.poly6_grad * (settings.support_radius2 - dist2) * (3.0f * settings.support_radius2 - 7.0f * dist2);
                         }
                     }
                 }
             }
         }
+
         f32 grad_length = glm::length(surface_tension_grad);
         f32 epsilon = 1e-6f;
         if (grad_length >= epsilon)
@@ -295,11 +354,13 @@ void SPH::ComputePressureViscousSurfaceTensionForce()
 
 void SPH::ComputePressureViscousSurfaceTensionForceIntrinsics()
 {
+    // Particle data arrays
+    f32 pj_density[8] = { 0.0f }, pj_pressure[8] = { 0.0f };
     f32 pj_px[8] = { 0.0f }, pj_py[8] = { 0.0f }, pj_pz[8] = { 0.0f };
     f32 pj_vx[8] = { 0.0f }, pj_vy[8] = { 0.0f }, pj_vz[8] = { 0.0f };
-    f32 pj_density[8] = { 0.0f }, pj_pressure[8] = { 0.0f };
 
-    __m256 _viscosity, _mass;
+    __m256 _mass, _viscosity;
+
     __m256 _gravity_x, _gravity_y, _gravity_z;
 
     // pi data
@@ -319,7 +380,7 @@ void SPH::ComputePressureViscousSurfaceTensionForceIntrinsics()
     __m256 _dir_x, _dir_y, _dir_z;
 
     // Kernels
-    __m256 _support_radius, _support_radius2, _spiky_grad, _spiky_laplacian;
+    __m256 _spiky_grad, _spiky_laplacian, _support_radius, _support_radius2;
     __m256 _dr, _dr2, _dr3;
 
     // Forces
@@ -340,19 +401,22 @@ void SPH::ComputePressureViscousSurfaceTensionForceIntrinsics()
     __m256 _norm_mag, _norm_x, _norm_y, _norm_z;
 
     // Constants
-    __m256 _zero, _two, _mask1, _mask2;
+    __m256 _zero, _two;
+    __m256 _mask1, _mask2;
+    
     __m256 _min, _max;
 
-    _support_radius  = _mm256_set1_ps(settings.support_radius);
-    _support_radius2 = _mm256_set1_ps(settings.support_radius2);
+    _mass = _mm256_set1_ps(settings.mass);
+    _viscosity = _mm256_set1_ps(settings.viscosity);
+
+    _support_radius    = _mm256_set1_ps(settings.support_radius);
+    _support_radius2   = _mm256_set1_ps(settings.support_radius2);
     _spiky_grad        = _mm256_set1_ps(settings.spiky_grad);
     _spiky_laplacian   = _mm256_set1_ps(settings.viscosity_laplacian);
 
     _gravity_x = _mm256_set1_ps(settings.gravity.x);
     _gravity_y = _mm256_set1_ps(settings.gravity.y);
     _gravity_z = _mm256_set1_ps(settings.gravity.z);
-    _viscosity = _mm256_set1_ps(settings.viscosity);
-    _mass      = _mm256_set1_ps(settings.mass);
 
     _zero = _mm256_set1_ps(0.0f);
     _two  = _mm256_set1_ps(2.0f);
@@ -383,10 +447,10 @@ void SPH::ComputePressureViscousSurfaceTensionForceIntrinsics()
         _acceleration_z = _mm256_setzero_ps();
         
         // Reset pressure
-        _pf = _mm256_setzero_ps();
-        _pressure_force_x   = _mm256_setzero_ps();
-        _pressure_force_y   = _mm256_setzero_ps();
-        _pressure_force_z   = _mm256_setzero_ps();
+        _pf               = _mm256_setzero_ps();
+        _pressure_force_x = _mm256_setzero_ps();
+        _pressure_force_y = _mm256_setzero_ps();
+        _pressure_force_z = _mm256_setzero_ps();
 
         // Reset viscous
         _viscous_force_x = _mm256_setzero_ps();
@@ -464,9 +528,10 @@ void SPH::ComputePressureViscousSurfaceTensionForceIntrinsics()
                         //dist = sqrt(dist2);
                         _dist = _mm256_sqrt_ps(_dist2);
 
+                        // TODO: REINPLEMENT PRESSURE FORCE
                         // Pressure force
-                        // pressure_force += -direction * pj.mass * ((pi.pressure + pj.pressure) / (2 * pj.density)) * spiky_grad * (support_radius - distance)^3;
-                       
+                        // pressure_force += pj.mass * diff * ((pi.pressure + pj.pressure) / (2.0f * pj.density)) * settings.spiky_grad * std::pow(settings.support_radius - dist, 3.0f) / dist;
+
                         // (support_radius - distance)^3
                         _dr  = _mm256_sub_ps(_support_radius, _dist);
                         _dr2 = _mm256_mul_ps(_dr, _dr);
@@ -497,6 +562,7 @@ void SPH::ComputePressureViscousSurfaceTensionForceIntrinsics()
                         _pressure_force_y = _mm256_fmadd_ps(_pf, _dir_y, _pressure_force_y);
                         _pressure_force_z = _mm256_fmadd_ps(_pf, _dir_z, _pressure_force_z);
 
+                        // TODO: REINPLEMENT VISCOUS FORCE
                         // Viscous force
                         // viscous_force += pj.mass * viscosity * ((pj.velocity - pi.velocity) / pj.density) * spiky_laplacian * (support_radius - distance)
 
@@ -540,6 +606,7 @@ void SPH::ComputePressureViscousSurfaceTensionForceIntrinsics()
                         _viscous_force_y = _mm256_add_ps(_viscous_force_y, _viscous_comp_y);
                         _viscous_force_z = _mm256_add_ps(_viscous_force_z, _viscous_comp_z);
 
+                        // TODO: REINPLEMENT SURFACE TENSION FORCE
                         // Normal
                         _normal_x = _mm256_fmadd_ps(_pf, _dir_x, _normal_x);
                         _normal_y = _mm256_fmadd_ps(_pf, _dir_y, _normal_y);
@@ -548,7 +615,8 @@ void SPH::ComputePressureViscousSurfaceTensionForceIntrinsics()
                 }
             }
         }
-
+        
+        // TODO: REINPLEMENT SURFACE TENSION FORCE
         //f32 curvature = -glm::length(normal);
         //if (curvature > 0.0f)
             //surface_tension_force = -settings.surface_tension_constant * curvature * settings.spiky_laplacian * glm::normalize(normal);
@@ -559,7 +627,7 @@ void SPH::ComputePressureViscousSurfaceTensionForceIntrinsics()
                 _mm256_add_ps(
                     _mm256_mul_ps(_normal_x, _normal_x), 
                     _mm256_mul_ps(_normal_y, _normal_y)), 
-                _mm256_mul_ps(_normal_z, _normal_z)
+                    _mm256_mul_ps(_normal_z, _normal_z)
             ));
         
         __m256 _epsilon = _mm256_set1_ps(1e-6f);
@@ -665,8 +733,8 @@ void SPH::ComputeBoundaryCondition()
                         if (&pi == &pj || pj.hash != cell_hash)
                             continue;
 
-                        vf3 diff  = pj.position - pi.position;
-                        f32 dist2 = glm::length2(diff);
+                        vf3 dp  = pj.position - pi.position;
+                        f32 dist2 = glm::length2(dp);
                         f32 dist  = std::sqrt(dist2);
 
                         if (dist < settings.radius)
@@ -674,21 +742,25 @@ void SPH::ComputeBoundaryCondition()
                             if (dist < 1e-6f)
                                 dist = 1e-6f;
 
-                            vf3 dir = diff / dist;
+                            // normalize
+                            vf3 dir = dp / dist;
                             f32 overlap = settings.radius - dist;
-                            //pi.position -= dir * overlap * 0.5f;
-                            //pj.position += dir * overlap * 0.5f;
 
+                            pi.position -= dir * overlap * 0.5f;
+                            pj.position += dir * overlap * 0.5f;
+
+                            // TODO: transform into optimal form
+                            
                             //vf3 surface_normal = -diff / dist;
                             //pi.velocity += glm::dot(pj.velocity, surface_normal) * 0.005f * 2.0f;
                             //pj.velocity += glm::dot(pi.velocity, surface_normal) * 0.005f * 2.0f;
 
-                            //vf3 relative_velocity = pi.velocity - pj.velocity;
-                            //f32 velocity_along_normal = glm::dot(relative_velocity, dir);
-                            //f32 combined_mass = pi.mass + pj.mass;
-                            //f32 impulse = (2.0f * velocity_along_normal) / combined_mass;
-                            //pi.velocity -= impulse * (pj.mass / combined_mass) * dir * 0.005f;
-                            //pj.velocity += impulse * (pi.mass / combined_mass) * dir * 0.005f;
+                            vf3 relative_velocity = pi.velocity - pj.velocity;
+                            f32 velocity_along_normal = glm::dot(relative_velocity, dir);
+                            f32 combined_mass = pi.mass + pj.mass;
+                            f32 impulse = (2.0f * velocity_along_normal) / combined_mass;
+                            pi.velocity -= impulse * (pj.mass / combined_mass) * dir * 0.005f;
+                            pj.velocity += impulse * (pi.mass / combined_mass) * dir * 0.005f;
                         }
                     }
                 }
@@ -734,7 +806,7 @@ void SPH::ComputeBoundaryCondition()
 std::vector<Particle>& SPH::GetParticles() { return fluid_particles; }
 SPHStatistics& SPH::GetStats() { return stats; }
 
-void SPH::ComputeStats()
+void SPH::ComputeStatistics()
 {
     stats.densities.clear();
     stats.densities.resize(fluid_particles.size());
@@ -745,6 +817,7 @@ void SPH::ComputeStats()
     }
 }
 
+// Spatial Hash Map
 void SPH::CreateNeighborTable()
 {
     particle_table.clear();
@@ -761,6 +834,5 @@ void SPH::CreateNeighborTable()
     }
 }
 
-// Hash map
 vi3 SPH::cell(const Particle& p, f32 h) { return { p.position.x / h, p.position.y / h, p.position.z / h }; }
 u32 SPH::hash(const vi3& cell) { return (static_cast<u32>(cell.x * 92837111) ^ static_cast<u32>(cell.y * 689287499) ^ static_cast<u32>(cell.z * 283823481)) % TABLE_SIZE; }

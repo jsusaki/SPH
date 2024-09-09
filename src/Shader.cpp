@@ -9,22 +9,22 @@ Shader::Shader(const std::string& vertex_path, const std::string& fragment_path)
 {
     id = glCreateProgram();
 
-    std::string vertex_source   = LoadFromFile(vertex_path);
-    std::string fragment_source = LoadFromFile(fragment_path);
+    std::string vertex_source   = load_from_file(vertex_path);
+    std::string fragment_source = load_from_file(fragment_path);
 
-    u32 vertex_shader   = Compile(VERTEX, vertex_source);
-    u32 fragment_shader = Compile(FRAGMENT, fragment_source);
+    u32 vertex_shader   = compile(VERTEX, vertex_source);
+    u32 fragment_shader = compile(FRAGMENT, fragment_source);
 
-    Attach(vertex_shader);
-    Attach(fragment_shader);
+    attach(vertex_shader);
+    attach(fragment_shader);
 
-    Link();
+    link();
 
-    Detach(vertex_shader);
-    Detach(fragment_shader);
+    detach(vertex_shader);
+    detach(fragment_shader);
 
-    Delete(vertex_shader);
-    Delete(fragment_shader);
+    destroy(vertex_shader);
+    destroy(fragment_shader);
 }
 
 Shader::~Shader()
@@ -47,7 +47,7 @@ u32 Shader::GetID()
     return id;
 }
 
-std::string Shader::LoadFromFile(const std::string& filepath)
+std::string Shader::load_from_file(const std::string& filepath)
 {
     std::string data;
     std::ifstream file(filepath, std::ios::in | std::ios::binary);
@@ -60,7 +60,7 @@ std::string Shader::LoadFromFile(const std::string& filepath)
     return data;
 }
 
-u32 Shader::Compile(ShaderType type, std::string& source)
+u32 Shader::compile(ShaderType type, std::string& source)
 {
     u32 shader = glCreateShader(type);
     const char* shader_src = source.c_str();
@@ -85,12 +85,12 @@ u32 Shader::Compile(ShaderType type, std::string& source)
     return shader;
 }
 
-void Shader::Attach(u32& shader)
+void Shader::attach(u32& shader)
 {
     glAttachShader(id, shader);
 }
 
-void Shader::Link()
+void Shader::link()
 {
     glLinkProgram(id);
 
@@ -110,12 +110,12 @@ void Shader::Link()
     }
 }
 
-void Shader::Detach(u32& shader)
+void Shader::detach(u32& shader)
 {
     glDetachShader(id, shader);
 }
 
-void Shader::Delete(u32& shader)
+void Shader::destroy(u32& shader)
 {
     glDeleteShader(shader);
 }
@@ -127,11 +127,11 @@ u32 Shader::GetAttribute(const std::string& name) const
 
 u32 Shader::GetUniform(const std::string& name) const
 {
-    if (uiform_locations.find(name) != uiform_locations.end())
-        return uiform_locations[name];
+    if (uniform_locations.find(name) != uniform_locations.end())
+        return uniform_locations[name];
 
     u32 location = glGetUniformLocation(id, name.c_str());
-    uiform_locations[name] = location;
+    uniform_locations[name] = location;
     return location;
 }
 

@@ -85,30 +85,33 @@ void Simulator::Create()
     // Create SPH System Settings
     default_settings = {
         // Simulation parameters
-        .n_particles  = 500,
-        .rest_density = 1000.0f,
-        .stiffness    = 3.0f,
-        .viscosity    = 1.0f, //0.00005f,
+        .n_particles              = 5000,
+        .initial_particle_density = 315.0f / (64.0f * PI * std::pow(SMOOTHING_RADIUS, 3.0f)),
+        .rest_density             = 1000.0f,
+        .stiffness                = 3.0f,
+        .viscosity                = 0.001f, //1.0f, //0.00005f,
         .surface_tension_constant = 0.0001f, //0.0728f
-        .gravity      = { 0.0f, 0.0f, 0.0f }, //{ 0.0f, -9.80665f, 0.0f },
-        .mass         = 0.02f,
-        .dt           = 0.02f,
-        .radius       = 0.03f,
+        .gravity                  = { 0.0f, 0.0f, 0.0f }, //{ 0.0f, -9.80665f, 0.0f },
+        .mass                     = 0.02f,
+        .dt                       = 0.02f,
+        .radius                   = 0.03f,
         // Smoothing Kernel
-        .support_radius    = 0.04f,
-        .support_radius2   = std::pow(SMOOTHING_RADIUS, 2.0f),
-        .poly6               =  315.0f / (64.0f * PI * std::pow(SMOOTHING_RADIUS, 9.0f)),
-        .poly6_grad          = -945.0f / (32.0f * PI * std::pow(SMOOTHING_RADIUS, 9.0f)),
-        .spiky_grad          = -45.0f / (PI * std::pow(SMOOTHING_RADIUS, 6.0f)),
-        .viscosity_laplacian =  45.0f / (PI * std::pow(SMOOTHING_RADIUS, 6.0f)),
+        .support_radius           = 0.04f,
+        .support_radius2          = std::pow(SMOOTHING_RADIUS, 2.0f),
+        .poly6                    = 315.0f / (64.0f * PI * std::pow(SMOOTHING_RADIUS, 9.0f)),
+        .poly6_grad               = -945.0f / (32.0f * PI * std::pow(SMOOTHING_RADIUS, 9.0f)),
+        .spiky_grad               = -45.0f / (PI * std::pow(SMOOTHING_RADIUS, 6.0f)),
+        .viscosity_laplacian      =  45.0f / (PI * std::pow(SMOOTHING_RADIUS, 6.0f)),
         // Boundary
         .boundary_epsilon = 0.0000001f,
-        .boundary_damping = -0.6f,
-        .boundary_size = { 0.6f, 0.6f, 0.6f },
-        .boundary_min  = {-0.6f,-0.6f,-0.6f },
-        .boundary_max  = { 0.6f, 0.6f, 0.6f },
+        .boundary_damping = -1.0f,
+        .boundary_size    = { 0.6f, 0.6f, 0.6f },
+        .boundary_min     = {-0.6f,-0.6f,-0.6f },
+        .boundary_max     = { 0.6f, 0.6f, 0.6f },
         // GFX
-        .sphere_scale = 0.0125f
+        .sphere_scale     = 0.0125f,
+        .particle_spacing = 0.0f,
+        .cube_offset      = { 0.0f, 0.25f, 0.0f },
     };
     sph.Init(default_settings);
     current_settings = default_settings;
@@ -140,7 +143,11 @@ void Simulator::Create()
     boundary_models.push_back(cube_model);
 
     // Create Shader
-    shader = std::make_shared<Shader>("res/shaders/basic.vs", "res/shaders/basic.fs");
+    particle_shader = std::make_shared<Shader>("res/shaders/basic_particle.vert", "res/shaders/basic.frag");
+    boundary_shader = std::make_shared<Shader>("res/shaders/basic_boundary.vert", "res/shaders/basic.frag");
+
+    fcolor c = to_float(palette[0]);
+    color_factor = std::vector<f32>(particles.size(), c.b);
 
     // Create GUI
     gui.Init(window.GetWindow());
@@ -165,15 +172,17 @@ void Simulator::ProcessInput()
     // Step the simulation
     if (input.IsKeyPressed(GLFW_KEY_S))
         next_state = State::STEP;
+    // Restart the current simulation
+    if (input.IsKeyPressed(GLFW_KEY_R) || gui.IsRestartPressed())
+        next_state = State::RESTART;
     // Reset the simulation to default state
-    if (input.IsKeyPressed(GLFW_KEY_R) || gui.IsResetPressed())
+    if (input.IsKeyPressed(GLFW_KEY_T) || gui.IsResetPressed())
         next_state = State::RESET;
     // Apply the new setting to the simulation
     if (input.IsKeyPressed(GLFW_KEY_A) || gui.IsApplyPressed())
         next_state = State::APPLY;
-    // Restart the current simulation
-    if (input.IsKeyPressed(GLFW_KEY_T) || gui.IsRestartPressed())
-        next_state = State::RESTART;
+    
+    // TODO: Interpolate camera positions
     // Fixed Camera Positions
     if (input.IsKeyPressed(GLFW_KEY_1))
     {
@@ -198,18 +207,23 @@ void Simulator::ProcessInput()
     }
     if (input.IsKeyPressed(GLFW_KEY_4))
     {
-        vf3 eye    = { 1.025f, -0.005f, 1.535f };
-        vf3 center = { 0.6f, 0.01f, 0.4f };
-        vf3 up     = { -0.005f, 1.0f, 0.015f };
+        vf3 eye    = { 1.30f, 0.80f, 1.57f };
+        vf3 center = { 0.0f,  0.0f, 0.0f };
+        vf3 up     = { -0.22f, 0.93f,-0.29f };
         camera.init(eye, center, up);
     }
     // AVX2
     if (input.IsKeyPressed(GLFW_KEY_X)) gui.ToggleAVX2();
     sph.SetAVX2(gui.IsAVX2Enabled());
+    
+    // Wireframe
+    if (input.IsKeyPressed(GLFW_KEY_W)) gui.ToggleWireframe();
+    enable_wireframe = gui.IsWireframeEnabled();
 
     // Mouse control
-    // TODO: incorporate into camera
+    // TODO: incorporate mouse_pos_transformed into arcball camera
     mouse_pos_transformed = transform_mouse(input.GetMouse());
+ 
     if (!gui.IsWindowFocused())
     {
         if (prev_mouse_pos_transformed != (vf2(-2.0f)))
@@ -221,8 +235,8 @@ void Simulator::ProcessInput()
             if (input.IsButtonPressed(GLFW_MOUSE_BUTTON_RIGHT))
             {
                 // TODO: incorporate into camera
-                vf2 dxy  = mouse_pos_transformed - prev_mouse_pos_transformed;
-                vf4 dxy4 = camera.inv_projection() * vf4(dxy.x, dxy.y, 0.0f, 1.0f);
+                vf2 dxy  = mouse_pos_transformed - prev_mouse_pos_transformed;      // GetMouseCurrent() - GetMousePrev()
+                vf4 dxy4 = camera.inv_projection() * vf4(dxy.x, dxy.y, 0.0f, 1.0f); // Get
                 camera.pan(vf2(dxy4.x, dxy4.y));
             }
         }
@@ -251,12 +265,12 @@ void Simulator::Simulate(f32 dt)
     case State::STEP:
     {
         sph.Simulate(current_settings);
-        n_steps++;
         std::vector<Particle>& particles = sph.GetParticles();
         for (s32 i = 0; i < particles.size(); i++)
             particle_models[i].translate(particles[i].position);
         if (current_state == State::STEP)
             next_state = State::PAUSE;
+        n_steps++;
         break;
     } 
     case State::RESET:
@@ -295,30 +309,82 @@ void Simulator::Render()
     window.Clear({ 25, 25, 25, 255 });
 
     // Enable rendering flags
-    glEnable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_MULTISAMPLE);
     glEnable(GL_LINE_SMOOTH);
     glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
-    glEnable(GL_POLYGON_SMOOTH);
     glHint(GL_POLYGON_SMOOTH_HINT, GL_NICEST);
 
-    // Activate shader
-    shader->Use();
+    if (enable_wireframe)
+        glEnable(GL_POLYGON_SMOOTH);
+    else
+        glDisable(GL_POLYGON_SMOOTH);
+    
+    // TODO: review  density color debugging; radius?
+    /*
+    if (current_state == State::SIMULATE || current_state == State::STEP)
+    {
+        // Get particle density
+        f32 min_density = std::numeric_limits<f32>::max();
+        f32 max_density = std::numeric_limits<f32>::lowest();
+        // Find min and max densities
+        for (s32 i = 0; i < particles.size(); i++)
+        {
+            Particle& p = particles[i];
+            if (p.density < min_density) min_density = p.density;
+            if (p.density > max_density) max_density = p.density;
+        }
+        // Normalize densities
+        for (s32 i = 0; i < particles.size(); i++)
+        {
+            color_factor[i] = glm::length(p.velocity); //(p.density - min_density) / (max_density - min_density + 1e-6f);
+        }
+    }
+    */
 
-    // Set Projection View Matrix
-    shader->SetUniform("proj_view", camera.proj_camera());
+    // Particle Shader
+    particle_shader->Use();
+    particle_shader->SetUniform("proj_view", camera.proj_camera());
 
-    // Draw models
-    for (auto& particle_model : particle_models)
-        particle_model.draw(shader);
+    f32 min_velocity = std::numeric_limits<float>::max();
+    f32 max_velocity = std::numeric_limits<float>::lowest();
+
+    std::vector<Particle>& particles = sph.GetParticles();
+    for (const Particle& p : particles)
+    {
+        f32 velocity_magnitude = glm::length(p.velocity);
+        if (velocity_magnitude < min_velocity) min_velocity = velocity_magnitude;
+        if (velocity_magnitude > max_velocity) max_velocity = velocity_magnitude;
+    }
+
+    // Normalize velocity and pass as a uniform
+    for (s32 i = 0; i < particle_models.size(); i++)
+    {
+        Particle& p = particles[i];
+        f32 velocity_magnitude = glm::length(p.velocity);
+
+        // Normalize between 0 and 1
+        f32 normalized_velocity = (velocity_magnitude - min_velocity) / (max_velocity - min_velocity + 1e-6f);
+
+        // TODO: Ability to change color palette
+        // Pass normalized velocity to GPU as a color factor uniform
+        particle_shader->Use();
+        particle_shader->SetUniform("color_factor", normalized_velocity);
+        particle_models[i].draw(particle_shader);
+    }
+
+    particle_shader->Unuse();
+
+    // Boundary Shader
+    boundary_shader->Use();
+    boundary_shader->SetUniform("proj_view", camera.proj_camera());
 
     for (auto& boundary_model : boundary_models)
-        boundary_model.draw(shader, GL_LINES);
+        boundary_model.draw(boundary_shader, GL_LINES);
 
-    // Deactivate shader
-    shader->Unuse();
+    boundary_shader->Unuse();
 
     // Render GUI
     gui.Render();

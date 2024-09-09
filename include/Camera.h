@@ -6,6 +6,7 @@ class ArcballCamera
 public:
     ArcballCamera() = default;
     ArcballCamera(const vf3& eye, const vf3& center, const vf3& up, f32 fov, f32 aspect, f32 near, f32 far);
+
 public:
     void init(const vf3& eye, const vf3& center, const vf3& up);
 

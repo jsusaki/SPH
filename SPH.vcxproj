@@ -502,8 +502,10 @@
     <None Include="lib\glm\gtx\vector_query.inl" />
     <None Include="lib\glm\gtx\wrap.inl" />
     <None Include="README.md" />
-    <None Include="res\shaders\basic.fs" />
-    <None Include="res\shaders\basic.vs" />
+    <None Include="res\shaders\basic.frag" />
+    <None Include="res\shaders\basic_particle.vert" />
+    <None Include="res\shaders\basic_boundary.vert" />
+    <None Include="utils\color_converter.py" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="LICENSE.txt" />

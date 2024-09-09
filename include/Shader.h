@@ -32,13 +32,13 @@ public:
 	void Unuse();
 	u32 GetID();
 
-public:
-	std::string LoadFromFile(const std::string& filepath);
-	u32  Compile(ShaderType type, std::string& source);
-	void Attach(u32& shader);
-	void Link();
-	void Detach(u32& shader);
-	void Delete(u32& shader);
+private:
+	std::string load_from_file(const std::string& filepath);
+	u32  compile(ShaderType type, std::string& source);
+	void attach(u32& shader);
+	void link();
+	void detach(u32& shader);
+	void destroy(u32& shader);
 
 public:
 	u32  GetAttribute(const std::string& name) const;
@@ -55,5 +55,5 @@ public:
 
 private:
 	u32 id;
-	mutable std::unordered_map<std::string, u32> uiform_locations;
+	mutable std::unordered_map<std::string, u32> uniform_locations;
 };

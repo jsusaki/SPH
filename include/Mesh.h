@@ -86,7 +86,6 @@ struct mesh
 		glEnableVertexAttribArray(2);
 		glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(vertex), (void*)offsetof(vertex, color));
 
-
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
 	}
@@ -159,7 +158,7 @@ struct mesh
 				v.position = vertex_points[vertex_indices[i][j]];
 				v.normal   = vertex_normals[vertex_normal_indices[i][j]];
 
-				const fcolor& c = to_float(colors[0]);
+				const fcolor& c = to_float(palette[0]);
 				v.color = { c.r, c.g, c.b, c.a };
 
 				vertices.push_back(v);
@@ -174,6 +173,7 @@ struct cube : public mesh
 	cube()
 	{
 		vertices = {
+												     // color: white
 			{{-1.0f, -1.0f,-1.0f},{1.0f, 0.0f, 0.0f},{1.0f, 1.0f, 1.0f, 1.0f}}, //v0
 			{{ 1.0f, -1.0f,-1.0f},{1.0f, 0.0f, 0.0f},{1.0f, 1.0f, 1.0f, 1.0f}}, //v1
 			{{ 1.0f,  1.0f,-1.0f},{1.0f, 0.0f, 0.0f},{1.0f, 1.0f, 1.0f, 1.0f}}, //v2

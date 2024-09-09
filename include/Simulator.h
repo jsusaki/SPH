@@ -64,9 +64,13 @@ private: // Simulation variables
     vf2 transform_mouse(vf2 p) { return vf2(p.x * 2.0f / SCREEN_WIDTH - 1.0f, 1.0f - 2.0f * p.y / SCREEN_HEIGHT); }
 
     // Graphics
-    std::shared_ptr<Shader> shader;
+    std::shared_ptr<Shader> particle_shader;
+    std::shared_ptr<Shader> boundary_shader;
     std::vector<model> particle_models;
     std::vector<model> boundary_models;
+    std::vector<f32> color_factor;
+    bool enable_wireframe = false;
+
 
     // Smoothed Particle Hydrodynamics
     SPH sph;
